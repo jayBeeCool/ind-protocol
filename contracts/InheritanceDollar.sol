@@ -415,4 +415,22 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         require(remaining == 0, "insufficient-spendable");
     }
+
+    function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
+        uint64 nowTs = uint64(block.timestamp);
+
+        _lots[to].push(
+            Lot({
+                senderOwner: address(0),
+                amount: uint128(amount),
+                createdAt: nowTs,
+                minUnlockTime: nowTs,
+                unlockTime: nowTs,
+                characteristic: bytes32(0)
+            })
+        );
+
+        _mint(to, amount);
+    }
+
 }
