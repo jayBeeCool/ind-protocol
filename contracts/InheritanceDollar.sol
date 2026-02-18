@@ -93,6 +93,52 @@ contract INDKeyRegistry is AccessControl {
         emit KeysInitialized(msg.sender, signingKey, revokeKey);
     }
 
+
+    // -------- Rotations (B1+B) --------
+
+    function rotateSigning(address owner, address newSigning) external {
+        require(newSigning != address(0), "signingKey=0");
+        Keys storage k = _keys[owner];
+        require(k.initialized, "not-initialized");
+        require(msg.sender == k.revokeKey, "not-revoke");
+        address old = k.signingKey;
+        k.signingKey = newSigning;
+        k.revokeNonce++;
+        emit SigningKeyRotated(owner, old, newSigning, k.revokeNonce - 1);
+    }
+
+    function rotateRevoke(address owner, address newRevoke) external {
+        require(newRevoke != address(0), "revokeKey=0");
+        Keys storage k = _keys[owner];
+        require(k.initialized, "not-initialized");
+        require(msg.sender == k.revokeKey, "not-revoke");
+        address old = k.revokeKey;
+        k.revokeKey = newRevoke;
+        k.revokeNonce++;
+        emit RevokeKeyRotated(owner, old, newRevoke, k.revokeNonce - 1);
+    }
+
+
+    function initKeysFromAdmin(address owner, address signingKey, address revokeKey)
+        external
+        onlyRole(REGISTRY_ADMIN_ROLE)
+    {
+        require(owner != address(0), "owner=0");
+        require(signingKey != address(0), "signingKey=0");
+        require(revokeKey != address(0), "revokeKey=0");
+
+        Keys storage k = _keys[owner];
+        require(!k.initialized, "already-initialized");
+
+        k.signingKey = signingKey;
+        k.revokeKey  = revokeKey;
+        k.signingNonce = 0;
+        k.revokeNonce  = 0;
+        k.initialized  = true;
+
+        emit KeysInitialized(owner, signingKey, revokeKey);
+    }
+
     // -------- Admin helpers (called by token after signature verification) --------
 
     function useSigningNonce(address owner, uint256 expected)
@@ -277,13 +323,45 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     // --------------------------------------------------------------------
+    // Activation: one-shot initKeys + migrate full balance to signingKey
+    // --------------------------------------------------------------------
+
+    function activateKeysAndMigrate(address signingKey, address revokeKey) external {
+        registry.initKeysFromAdmin(msg.sender, signingKey, revokeKey);
+
+        uint256 bal = balanceOf(msg.sender);
+        if (bal > 0) {
+            super._transfer(msg.sender, signingKey, bal);
+
+            // make migrated funds immediately spendable under signingKey
+            _lots[signingKey].push(
+                Lot({
+                    senderOwner: address(0),
+                    amount: uint128(bal),
+                    createdAt: uint64(block.timestamp),
+                    minUnlockTime: uint64(block.timestamp),
+                    unlockTime: uint64(block.timestamp),
+                    characteristic: bytes32(0)
+                })
+            );
+        }
+    }
+
+    // --------------------------------------------------------------------
     // Sender controls (direct)
     // --------------------------------------------------------------------
 
     function reduceUnlockTime(address recipient, uint256 lotIndex, uint64 newUnlockTime) external {
         Lot storage lot = _lots[recipient][lotIndex];
         require(lot.amount != 0, "empty-lot");
-        require(msg.sender == lot.senderOwner, "not-sender");
+
+        address owner = lot.senderOwner;
+        address rk = registry.revokeKeyOf(owner);
+        if (rk != address(0)) {
+            require(msg.sender == rk, "not-revoke");
+        } else {
+            require(msg.sender == owner, "not-sender");
+        }
 
         require(block.timestamp < lot.unlockTime, "already-unlocked");
         require(newUnlockTime < lot.unlockTime, "not-reduction");
@@ -292,7 +370,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 old = lot.unlockTime;
         lot.unlockTime = newUnlockTime;
 
-        emit UnlockTimeReduced(msg.sender, recipient, lotIndex, old, newUnlockTime);
+        emit UnlockTimeReduced(owner, recipient, lotIndex, old, newUnlockTime);
     }
 
     function revoke(address recipient, uint256 lotIndex) external {
@@ -300,13 +378,21 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 amount = uint256(lot.amount);
 
         require(amount != 0, "empty-lot");
-        require(msg.sender == lot.senderOwner, "not-sender");
+
+        address owner = lot.senderOwner;
+        address rk = registry.revokeKeyOf(owner);
+        if (rk != address(0)) {
+            require(msg.sender == rk, "not-revoke");
+        } else {
+            require(msg.sender == owner, "not-sender");
+        }
+
         require(block.timestamp < lot.unlockTime, "already-unlocked");
 
         lot.amount = 0;
-        super._transfer(recipient, msg.sender, amount);
+        super._transfer(recipient, owner, amount);
 
-        _lots[msg.sender].push(
+        _lots[owner].push(
             Lot({
                 senderOwner: address(0),
                 amount: uint128(amount),
@@ -317,7 +403,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
             })
         );
 
-        emit Revoked(msg.sender, recipient, lotIndex, amount);
+        emit Revoked(owner, recipient, lotIndex, amount);
     }
 
     // --------------------------------------------------------------------

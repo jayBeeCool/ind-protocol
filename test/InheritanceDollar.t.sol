@@ -14,7 +14,14 @@ contract InheritanceDollarTest is Test {
 
     function setUp() public {
         reg = new INDKeyRegistry(admin);
+        // debug: admin must have DEFAULT_ADMIN_ROLE (0x00)
+        assertTrue(reg.hasRole(bytes32(0), admin));
+        // debug: admin must have DEFAULT_ADMIN_ROLE (0x00)
+        assertTrue(reg.hasRole(bytes32(0), admin));
         ind = new InheritanceDollar(admin, reg);
+        vm.startPrank(admin);
+        reg.grantRole(reg.REGISTRY_ADMIN_ROLE(), address(ind));
+        vm.stopPrank();
 
         // Nota importante: nel contratto attuale non esiste mint pubblico.
         // Per ora testiamo solo i revert "di regola" che non richiedono fondi spendibili.
@@ -149,6 +156,72 @@ contract InheritanceDollarTest is Test {
         vm.prank(revokeKey);
         vm.expectRevert(); // Should revert today (not senderOwner)
         ind.revoke(bob, 1);
+    }
+
+
+    function test_owner_cannot_revoke_after_setup() public {
+        vm.prank(admin);
+        ind.mint(alice, 100 ether);
+
+        // Setup keys
+        vm.prank(alice);
+        reg.initKeys(address(0x1111), address(0x2222));
+
+        vm.prank(alice);
+        ind.transfer(bob, 10 ether);
+
+        // Owner tries revoke -> must revert
+        vm.prank(alice);
+        vm.expectRevert();
+        ind.revoke(bob, 0);
+    }
+
+    function test_revokeKey_can_revoke() public {
+        vm.prank(admin);
+        ind.mint(alice, 100 ether);
+
+        vm.prank(alice);
+        reg.initKeys(address(0x1111), address(0x2222));
+
+        vm.prank(alice);
+        ind.transfer(bob, 10 ether);
+
+        vm.prank(address(0x2222));
+        ind.revoke(bob, 0);
+
+        assertEq(ind.balanceOf(bob), 0);
+    }
+
+    function test_revokeKey_can_rotate_signingKey() public {
+        vm.prank(alice);
+        reg.initKeys(address(0x1111), address(0x2222));
+
+        vm.prank(address(0x2222));
+        reg.rotateSigning(alice, address(0x3333));
+
+        assertEq(reg.signingKeyOf(alice), address(0x3333));
+    }
+
+
+    function test_activate_migrates_balance_to_signingKey() public {
+        address signing = address(0x1111);
+        address revokeK = address(0x2222);
+
+        vm.prank(admin);
+        ind.mint(alice, 100 ether);
+
+        assertEq(ind.balanceOf(alice), 100 ether);
+        assertEq(ind.balanceOf(signing), 0);
+
+        vm.prank(alice);
+        ind.activateKeysAndMigrate(signing, revokeK);
+
+        assertEq(ind.balanceOf(alice), 0);
+        assertEq(ind.balanceOf(signing), 100 ether);
+
+        // registry initialized
+        assertEq(reg.signingKeyOf(alice), signing);
+        assertEq(reg.revokeKeyOf(alice), revokeK);
     }
 
 }
