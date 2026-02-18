@@ -160,33 +160,43 @@ contract InheritanceDollarTest is Test {
 
 
     function test_owner_cannot_revoke_after_setup() public {
+        address signing = address(0x1111);
+        address revokeK = address(0x2222);
+
         vm.prank(admin);
         ind.mint(alice, 100 ether);
 
-        // Setup keys
+        // Owner activates and migrates to signingKey
         vm.prank(alice);
-        reg.initKeys(address(0x1111), address(0x2222));
+        ind.activateKeysAndMigrate(signing, revokeK);
 
-        vm.prank(alice);
+        // signingKey creates a locked lot
+        vm.prank(signing);
         ind.transfer(bob, 10 ether);
 
-        // Owner tries revoke -> must revert
+        // owner tries to revoke -> must fail (only revokeKey can)
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(bytes("not-revoke"));
         ind.revoke(bob, 0);
     }
 
     function test_revokeKey_can_revoke() public {
+        address signing = address(0x1111);
+        address revokeK = address(0x2222);
+
         vm.prank(admin);
         ind.mint(alice, 100 ether);
 
+        // Owner activates and migrates
         vm.prank(alice);
-        reg.initKeys(address(0x1111), address(0x2222));
+        ind.activateKeysAndMigrate(signing, revokeK);
 
-        vm.prank(alice);
+        // signingKey creates locked lot
+        vm.prank(signing);
         ind.transfer(bob, 10 ether);
 
-        vm.prank(address(0x2222));
+        // revokeKey revokes successfully
+        vm.prank(revokeK);
         ind.revoke(bob, 0);
 
         assertEq(ind.balanceOf(bob), 0);
@@ -222,6 +232,74 @@ contract InheritanceDollarTest is Test {
         // registry initialized
         assertEq(reg.signingKeyOf(alice), signing);
         assertEq(reg.revokeKeyOf(alice), revokeK);
+    }
+
+
+    // ------------------------
+    // AUDIT-CRITICAL TESTS
+    // ------------------------
+
+    function test_owner_disabled_even_if_receives_tokens_after_activation() public {
+        address signing = address(0x1111);
+        address revokeK = address(0x2222);
+
+        vm.prank(admin);
+        ind.mint(alice, 100 ether);
+
+        vm.prank(alice);
+        ind.activateKeysAndMigrate(signing, revokeK);
+
+        // signingKey sends some IND back to owner (owner receives, but must be non-operational)
+        vm.prank(signing);
+        ind.transfer(alice, 1 ether);
+
+        // owner tries to transfer -> MUST revert (owner-disabled)
+        vm.prank(alice);
+        vm.expectRevert(bytes("owner-disabled"));
+        ind.transfer(bob, 1 ether);
+    }
+
+    function test_lot_senderOwner_is_logical_owner_when_sent_by_signingKey() public {
+        address signing = address(0x1111);
+        address revokeK = address(0x2222);
+
+        vm.prank(admin);
+        ind.mint(alice, 50 ether);
+
+        vm.prank(alice);
+        ind.activateKeysAndMigrate(signing, revokeK);
+
+        vm.prank(signing);
+        ind.transfer(bob, 10 ether);
+
+        InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
+        assertEq(lots.length, 1);
+        assertEq(lots[0].senderOwner, alice); // must be logical owner, not signingKey
+    }
+
+    function test_revoke_refunds_to_signingKey_not_owner() public {
+        address signing = address(0x1111);
+        address revokeK = address(0x2222);
+
+        vm.prank(admin);
+        ind.mint(alice, 100 ether);
+
+        vm.prank(alice);
+        ind.activateKeysAndMigrate(signing, revokeK);
+
+        uint256 before = ind.balanceOf(signing);
+
+        // signingKey sends locked lot to bob
+        vm.prank(signing);
+        ind.transfer(bob, 10 ether);
+
+        // revokeKey revokes -> refund must go to signingKey (owner should not regain balance)
+        vm.prank(revokeK);
+        ind.revoke(bob, 0);
+
+        assertEq(ind.balanceOf(bob), 0);
+        assertEq(ind.balanceOf(alice), 0);
+        assertEq(ind.balanceOf(signing), before); // refunded back
     }
 
 }
