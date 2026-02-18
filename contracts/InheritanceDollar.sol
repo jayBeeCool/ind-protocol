@@ -218,6 +218,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     mapping(address => Lot[]) private _lots;
+    mapping(address => uint256) private _head;
 
     // -------- EIP-712 typehashes --------
     bytes32 private constant TRANSFER_TYPEHASH =
@@ -281,12 +282,16 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return _lots[account];
     }
 
+    function headOf(address account) external view returns (uint256) {
+        return _head[account];
+    }
+
     function spendableBalanceOf(address account) public view returns (uint256) {
         Lot[] storage arr = _lots[account];
         uint256 sum;
         uint64 nowTs = uint64(block.timestamp);
 
-        for (uint256 i = 0; i < arr.length; i++) {
+        for (uint256 i = _head[account]; i < arr.length; i++) {
             if (arr[i].amount != 0 && arr[i].unlockTime <= nowTs) {
                 sum += uint256(arr[i].amount);
             }
@@ -299,7 +304,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 sum;
         uint64 nowTs = uint64(block.timestamp);
 
-        for (uint256 i = 0; i < arr.length; i++) {
+        for (uint256 i = _head[account]; i < arr.length; i++) {
             if (arr[i].amount != 0 && arr[i].unlockTime > nowTs) {
                 sum += uint256(arr[i].amount);
             }
@@ -528,9 +533,18 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 remaining = amount;
         uint64 nowTs = uint64(block.timestamp);
 
-        for (uint256 i = 0; i < arr.length && remaining > 0; i++) {
+        uint256 i = _head[owner];
+        // consume only spendable lots, starting from head
+        for (; i < arr.length && remaining > 0; i++) {
             Lot storage lot = arr[i];
-            if (lot.amount == 0 || lot.unlockTime > nowTs) continue;
+
+            // skip empty lots; they can be compacted by advancing head later
+            if (lot.amount == 0) continue;
+
+            // not yet unlocked => cannot spend from here or later unlocked ones,
+            // but we must continue scanning because later lots might already be unlocked
+            // (unlockTime is not guaranteed monotonic).
+            if (lot.unlockTime > nowTs) continue;
 
             uint256 lotAmt = uint256(lot.amount);
             if (lotAmt <= remaining) {
@@ -543,8 +557,15 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         }
 
         require(remaining == 0, "insufficient-spendable");
-    }
 
+        // advance head over leading empty lots to prevent unbounded growth costs
+        uint256 h = _head[owner];
+        while (h < arr.length && arr[h].amount == 0) {
+            h++;
+        }
+        _head[owner] = h;
+
+    }
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         uint64 nowTs = uint64(block.timestamp);
 

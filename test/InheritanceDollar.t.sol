@@ -302,4 +302,31 @@ contract InheritanceDollarTest is Test {
         assertEq(ind.balanceOf(signing), before); // refunded back
     }
 
+    function test_head_advances_after_consumption() public {
+        vm.prank(admin);
+        ind.mint(alice, 300 ether);
+
+        // spam lots to Bob (locked)
+        vm.startPrank(alice);
+        for (uint256 i = 0; i < 200; i++) {
+            ind.transfer(bob, 1 ether);
+        }
+        vm.stopPrank();
+
+        // unlock all
+        vm.warp(block.timestamp + 86400);
+
+        // head should be 0 before spending
+        assertEq(ind.headOf(bob), 0);
+
+        // Bob spends everything in one go
+        address carl = address(0xC);
+        vm.prank(bob);
+        ind.transfer(carl, 200 ether);
+
+        // after consumption, spendable should be 0 and head should have advanced
+        assertEq(ind.spendableBalanceOf(bob), 0);
+        assertGt(ind.headOf(bob), 0);
+    }
+
 }
