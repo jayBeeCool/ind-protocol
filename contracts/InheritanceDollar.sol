@@ -366,6 +366,14 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         if (bal > 0) {
             super._transfer(msg.sender, signingKey, bal);
 
+            // clear sender lots to keep balance invariants consistent after full migration
+            Lot[] storage oldLots = _lots[msg.sender];
+            for (uint256 i = _head[msg.sender]; i < oldLots.length; i++) {
+                oldLots[i].amount = 0;
+            }
+            _head[msg.sender] = oldLots.length;
+
+
             // make migrated funds immediately spendable under signingKey
             _lots[signingKey].push(
                 Lot({
