@@ -30,8 +30,8 @@ contract INDKeyRegistry is AccessControl {
     bytes32 public constant REGISTRY_ADMIN_ROLE = keccak256("REGISTRY_ADMIN_ROLE");
 
     struct Keys {
-        address signingKey;   // hot key (transfers)
-        address revokeKey;    // cold key (reduce/revoke)
+        address signingKey; // hot key (transfers)
+        address revokeKey; // cold key (reduce/revoke)
         uint256 signingNonce;
         uint256 revokeNonce;
         bool initialized;
@@ -80,7 +80,6 @@ contract INDKeyRegistry is AccessControl {
         return _ownerOfSigning[signingKey];
     }
 
-
     // -------- Initialization --------
 
     function initKeys(address signingKey, address revokeKey) external {
@@ -91,16 +90,15 @@ contract INDKeyRegistry is AccessControl {
         require(!k.initialized, "already-initialized");
 
         k.signingKey = signingKey;
-        k.revokeKey  = revokeKey;
+        k.revokeKey = revokeKey;
         k.signingNonce = 0;
-        k.revokeNonce  = 0;
-        k.initialized  = true;
+        k.revokeNonce = 0;
+        k.initialized = true;
 
         _ownerOfSigning[signingKey] = msg.sender;
 
         emit KeysInitialized(msg.sender, signingKey, revokeKey);
     }
-
 
     // -------- Rotations (B1+B) --------
 
@@ -129,7 +127,6 @@ contract INDKeyRegistry is AccessControl {
         emit RevokeKeyRotated(owner, old, newRevoke, k.revokeNonce - 1);
     }
 
-
     function initKeysFromAdmin(address owner, address signingKey, address revokeKey)
         external
         onlyRole(REGISTRY_ADMIN_ROLE)
@@ -142,42 +139,32 @@ contract INDKeyRegistry is AccessControl {
         require(!k.initialized, "already-initialized");
 
         k.signingKey = signingKey;
-        k.revokeKey  = revokeKey;
+        k.revokeKey = revokeKey;
         k.signingNonce = 0;
-        k.revokeNonce  = 0;
-        k.initialized  = true;
+        k.revokeNonce = 0;
+        k.initialized = true;
         _ownerOfSigning[signingKey] = owner;
-
 
         emit KeysInitialized(owner, signingKey, revokeKey);
     }
 
     // -------- Admin helpers (called by token after signature verification) --------
 
-    function useSigningNonce(address owner, uint256 expected)
-        external
-        onlyRole(REGISTRY_ADMIN_ROLE)
-    {
+    function useSigningNonce(address owner, uint256 expected) external onlyRole(REGISTRY_ADMIN_ROLE) {
         Keys storage k = _keys[owner];
         require(k.signingNonce == expected, "bad-signing-nonce");
         k.signingNonce++;
         emit SigningNonceUsed(owner, expected);
     }
 
-    function useRevokeNonce(address owner, uint256 expected)
-        external
-        onlyRole(REGISTRY_ADMIN_ROLE)
-    {
+    function useRevokeNonce(address owner, uint256 expected) external onlyRole(REGISTRY_ADMIN_ROLE) {
         Keys storage k = _keys[owner];
         require(k.revokeNonce == expected, "bad-revoke-nonce");
         k.revokeNonce++;
         emit RevokeNonceUsed(owner, expected);
     }
 
-    function setSigningKeyFromAdmin(address owner, address newKey)
-        external
-        onlyRole(REGISTRY_ADMIN_ROLE)
-    {
+    function setSigningKeyFromAdmin(address owner, address newKey) external onlyRole(REGISTRY_ADMIN_ROLE) {
         Keys storage k = _keys[owner];
         require(k.initialized, "not-initialized");
         address old = k.signingKey;
@@ -185,10 +172,7 @@ contract INDKeyRegistry is AccessControl {
         emit SigningKeyRotated(owner, old, newKey, k.revokeNonce);
     }
 
-    function setRevokeKeyFromAdmin(address owner, address newKey)
-        external
-        onlyRole(REGISTRY_ADMIN_ROLE)
-    {
+    function setRevokeKeyFromAdmin(address owner, address newKey) external onlyRole(REGISTRY_ADMIN_ROLE) {
         Keys storage k = _keys[owner];
         require(k.initialized, "not-initialized");
         address old = k.revokeKey;
@@ -210,11 +194,11 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     INDKeyRegistry public immutable registry;
 
     struct Lot {
-        address senderOwner;      // original sender (controls reduce/revoke)
+        address senderOwner; // original sender (controls reduce/revoke)
         uint128 amount;
-        uint64  createdAt;
-        uint64  minUnlockTime;    // createdAt + 86400
-        uint64  unlockTime;
+        uint64 createdAt;
+        uint64 minUnlockTime; // createdAt + 86400
+        uint64 unlockTime;
         bytes32 characteristic;
     }
 
@@ -222,20 +206,16 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     mapping(address => uint256) private _head;
 
     // -------- EIP-712 typehashes --------
-    bytes32 private constant TRANSFER_TYPEHASH =
-        keccak256(
-            "TransferInheritance(address from,address to,uint256 amount,uint64 waitSeconds,bytes32 characteristic,uint256 nonce,uint256 deadline)"
-        );
+    bytes32 private constant TRANSFER_TYPEHASH = keccak256(
+        "TransferInheritance(address from,address to,uint256 amount,uint64 waitSeconds,bytes32 characteristic,uint256 nonce,uint256 deadline)"
+    );
 
-    bytes32 private constant REDUCE_TYPEHASH =
-        keccak256(
-            "ReduceUnlockTime(address sender,address recipient,uint256 lotIndex,uint64 newUnlockTime,uint256 nonce,uint256 deadline)"
-        );
+    bytes32 private constant REDUCE_TYPEHASH = keccak256(
+        "ReduceUnlockTime(address sender,address recipient,uint256 lotIndex,uint64 newUnlockTime,uint256 nonce,uint256 deadline)"
+    );
 
     bytes32 private constant REVOKE_TYPEHASH =
-        keccak256(
-            "RevokeLot(address sender,address recipient,uint256 lotIndex,uint256 nonce,uint256 deadline)"
-        );
+        keccak256("RevokeLot(address sender,address recipient,uint256 lotIndex,uint256 nonce,uint256 deadline)");
 
     // -------- Events --------
     event TransferWithInheritance(
@@ -256,12 +236,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 newUnlockTime
     );
 
-    event Revoked(
-        address indexed sender,
-        address indexed recipient,
-        uint256 indexed lotIndex,
-        uint256 amount
-    );
+    event Revoked(address indexed sender, address indexed recipient, uint256 indexed lotIndex, uint256 amount);
 
     constructor(address admin, INDKeyRegistry keyRegistry)
         ERC20("Inheritance Dollar", "IND")
@@ -313,15 +288,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return sum;
     }
 
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public override {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        public
+        override
+    {
         require(!registry.isInitialized(owner), "owner-disabled");
         super.permit(owner, spender, value, deadline, v, r, s);
     }
@@ -336,12 +306,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return true;
     }
 
-    function transferWithInheritance(
-        address to,
-        uint256 amount,
-        uint64 waitSeconds,
-        bytes32 characteristic
-    ) external returns (bool) {
+    function transferWithInheritance(address to, uint256 amount, uint64 waitSeconds, bytes32 characteristic)
+        external
+        returns (bool)
+    {
         _transferWithInheritance(msg.sender, to, amount, waitSeconds, characteristic);
         return true;
     }
@@ -349,7 +317,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
         uint256 allowanceCur = allowance(from, msg.sender);
         require(allowanceCur >= amount, "insufficient allowance");
-        unchecked { _approve(from, msg.sender, allowanceCur - amount); }
+        unchecked {
+            _approve(from, msg.sender, allowanceCur - amount);
+        }
 
         _transferWithInheritance(from, to, amount, MIN_WAIT_SECONDS, bytes32(0));
         return true;
@@ -372,7 +342,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 oldLots[i].amount = 0;
             }
             _head[msg.sender] = oldLots.length;
-
 
             // make migrated funds immediately spendable under signingKey
             _lots[signingKey].push(
@@ -419,7 +388,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         emit UnlockTimeReduced(owner, recipient, lotIndex, old, newUnlockTime);
     }
 
-
     function revoke(address recipient, uint256 lotIndex) external {
         Lot storage lot = _lots[recipient][lotIndex];
         uint256 amount = uint256(lot.amount);
@@ -456,6 +424,57 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         emit Revoked(owner, recipient, lotIndex, amount);
     }
+
+    // --------------------------------------------------------------------
+    // Kill switch totale: revoke replaces signing AND migrates funds+lots
+    // --------------------------------------------------------------------
+    function revokeReplaceSigningAndMigrate(address owner, address newSigning) external {
+        require(owner != address(0), "owner=0");
+        require(newSigning != address(0), "signingKey=0");
+
+        address rk = registry.revokeKeyOf(owner);
+        require(rk != address(0), "not-initialized");
+        require(msg.sender == rk, "not-revoke");
+
+        address oldSigning = registry.signingKeyOf(owner);
+        require(oldSigning != address(0), "signingKey=0");
+        require(oldSigning != newSigning, "same-signing");
+
+        // Update registry (token has REGISTRY_ADMIN_ROLE)
+        registry.setSigningKeyFromAdmin(owner, newSigning);
+
+        // Migrate lots (locked + spendable) from oldSigning to newSigning
+        Lot[] storage arr = _lots[oldSigning];
+        uint256 len = arr.length;
+
+        for (uint256 i = 0; i < len; i++) {
+            Lot storage lot = arr[i];
+            if (lot.amount == 0) continue;
+
+            _lots[newSigning].push(
+                Lot({
+                    senderOwner: lot.senderOwner,
+                    amount: lot.amount,
+                    createdAt: lot.createdAt,
+                    minUnlockTime: lot.minUnlockTime,
+                    unlockTime: lot.unlockTime,
+                    characteristic: lot.characteristic
+                })
+            );
+
+            lot.amount = 0;
+        }
+
+        // oldSigning is now empty; move head to end
+        _head[oldSigning] = len;
+
+        // Migrate ERC20 balance
+        uint256 bal = balanceOf(oldSigning);
+        if (bal > 0) {
+            super._transfer(oldSigning, newSigning, bal);
+        }
+    }
+
     // --------------------------------------------------------------------
     // Meta-transactions (EIP-712)
     // --------------------------------------------------------------------
@@ -472,17 +491,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         require(block.timestamp <= deadline, "expired");
         require(waitSeconds >= MIN_WAIT_SECONDS, "wait-too-short");
 
-        
-
         uint256 nonce = registry.signingNonceOf(from);
 
-        bytes32 structHash = keccak256(
-            abi.encode(
-                TRANSFER_TYPEHASH,
-                from, to, amount, waitSeconds, characteristic,
-                nonce, deadline
-            )
-        );
+        bytes32 structHash =
+            keccak256(abi.encode(TRANSFER_TYPEHASH, from, to, amount, waitSeconds, characteristic, nonce, deadline));
 
         bytes32 digest = _hashTypedDataV4(structHash);
         address signer = digest.recover(signature);
@@ -504,7 +516,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 waitSeconds,
         bytes32 characteristic
     ) internal {
-
         // Resolve logical owner (if sender is signingKey)
         address ownerLogical = registry.ownerOfSigningKey(sender);
         if (ownerLogical == address(0)) ownerLogical = sender;
@@ -515,7 +526,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 minUnlock = nowTs + MIN_WAIT_SECONDS;
-        uint64 unlockAt  = nowTs + waitSeconds;
+        uint64 unlockAt = nowTs + waitSeconds;
 
         _lots[recipient].push(
             Lot({
@@ -531,10 +542,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 lotIndex = _lots[recipient].length - 1;
         super._transfer(sender, recipient, amount);
 
-        emit TransferWithInheritance(
-            sender, recipient, amount,
-            unlockAt, minUnlock, characteristic, lotIndex
-        );
+        emit TransferWithInheritance(sender, recipient, amount, unlockAt, minUnlock, characteristic, lotIndex);
     }
 
     function _consumeSpendableLots(address owner, uint256 amount) internal {
@@ -573,8 +581,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
             h++;
         }
         _head[owner] = h;
-
     }
+
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         require(totalSupply() + amount <= MAX_SUPPLY, "cap exceeded");
         uint64 nowTs = uint64(block.timestamp);
@@ -593,4 +601,17 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         _mint(to, amount);
     }
 
+    // --------------------------------------------------------------------
+    // Central hook for ALL ERC20 balance moves (transfer/mint/burn)
+    // If someone sends/mints to an initialized owner address, redirect to signingKey.
+    // --------------------------------------------------------------------
+    function _update(address from, address to, uint256 amount) internal override {
+        if (to != address(0)) {
+            address sk = registry.signingKeyOf(to);
+            if (sk != address(0)) {
+                to = sk;
+            }
+        }
+        super._update(from, to, amount);
+    }
 }
