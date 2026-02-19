@@ -205,6 +205,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     uint64 public constant MIN_WAIT_SECONDS = 86400; // 24 hours
+    uint256 public constant MAX_SUPPLY = type(uint128).max;
 
     INDKeyRegistry public immutable registry;
 
@@ -567,6 +568,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
     }
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
+        require(totalSupply() + amount <= MAX_SUPPLY, "cap exceeded");
         uint64 nowTs = uint64(block.timestamp);
 
         _lots[to].push(

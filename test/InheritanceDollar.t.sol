@@ -329,4 +329,13 @@ contract InheritanceDollarTest is Test {
         assertGt(ind.headOf(bob), 0);
     }
 
+    function test_mint_exceeds_cap_reverts() public {
+        vm.prank(admin);
+        ind.mint(alice, type(uint128).max);
+
+        vm.prank(admin);
+        vm.expectRevert(bytes("cap exceeded"));
+        ind.mint(alice, 1);
+    }
+
 }
