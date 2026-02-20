@@ -7,3 +7,13 @@ contracts/*.bak.*
 gas_before.txt
 contracts/lib/
 *.bak_*
+
+# --- generated/backup/editor junk ---
+*.bak
+*.bak_*
+*.bak.*
+*~
+#*#
+*.swp
+*.tmp
+.DS_Store
