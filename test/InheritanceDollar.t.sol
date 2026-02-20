@@ -10,7 +10,7 @@ contract InheritanceDollarTest is Test {
 
     address admin = address(0xA11CE);
     address alice = address(0xA);
-    address bob   = address(0xB);
+    address bob = address(0xB);
 
     function setUp() public {
         reg = new INDKeyRegistry(admin);
@@ -41,7 +41,6 @@ contract InheritanceDollarTest is Test {
         assertEq(ind.lockedBalanceOf(alice), 0);
         assertEq(ind.spendableBalanceOf(alice), 100 ether);
     }
-
 
     function test_mint_transfer_lock_and_unlock() public {
         // Admin mints 100 to Alice
@@ -77,7 +76,6 @@ contract InheritanceDollarTest is Test {
 
         assertEq(balance, locked + spendable);
     }
-
 
     function test_reduceUnlockTime_valid_and_invalid() public {
         vm.prank(admin);
@@ -158,7 +156,6 @@ contract InheritanceDollarTest is Test {
         ind.revoke(bob, 1);
     }
 
-
     function test_owner_cannot_revoke_after_setup() public {
         address signing = address(0x1111);
         address revokeK = address(0x2222);
@@ -204,14 +201,14 @@ contract InheritanceDollarTest is Test {
 
     function test_revokeKey_can_rotate_signingKey() public {
         vm.prank(alice);
-        reg.initKeys(address(0x1111), address(0x2222));
+        vm.prank(alice);
+        ind.activateKeysAndMigrate(address(0x1111), address(0x2222));
 
         vm.prank(address(0x2222));
         reg.rotateSigning(alice, address(0x3333));
 
         assertEq(reg.signingKeyOf(alice), address(0x3333));
     }
-
 
     function test_activate_migrates_balance_to_signingKey() public {
         address signing = address(0x1111);
@@ -233,7 +230,6 @@ contract InheritanceDollarTest is Test {
         assertEq(reg.signingKeyOf(alice), signing);
         assertEq(reg.revokeKeyOf(alice), revokeK);
     }
-
 
     // ------------------------
     // AUDIT-CRITICAL TESTS
@@ -337,5 +333,4 @@ contract InheritanceDollarTest is Test {
         vm.expectRevert(bytes("cap exceeded"));
         ind.mint(alice, 1);
     }
-
 }

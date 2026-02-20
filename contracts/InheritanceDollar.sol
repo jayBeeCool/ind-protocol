@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "./lib/Gregorian.sol";
 
 /*
 Inheritance Dollar (IND)
@@ -82,7 +83,7 @@ contract INDKeyRegistry is AccessControl {
 
     // -------- Initialization --------
 
-    function initKeys(address signingKey, address revokeKey) external {
+    function initKeys(address signingKey, address revokeKey) internal {
         require(signingKey != address(0), "signingKey=0");
         require(revokeKey != address(0), "revokeKey=0");
 
@@ -186,12 +187,51 @@ contract INDKeyRegistry is AccessControl {
 /// ------------------------------------------------------------------------
 contract InheritanceDollar is ERC20Permit, AccessControl {
     using ECDSA for bytes32;
+    using Gregorian for uint256;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     uint64 public constant MIN_WAIT_SECONDS = 86400; // 24 hours
+    // Anti-abuse: cap maximum inheritance wait (upper bound; includes leap years)
+    uint64 public constant MAX_WAIT_SECONDS = uint64(50 * 366 days);
+
+    // Liveness tracking: last year an owner signed/spent
+    mapping(address => uint16) internal _lastSpendYear;
+    uint16 public constant INACTIVITY_YEARS = 7;
+    uint16 public constant MAX_WAIT_YEARS = 50;
     uint256 public constant MAX_SUPPLY = type(uint128).max;
 
     INDKeyRegistry public immutable registry;
+
+    // --------------------------------------------------------------------
+    // F2: lifecycle + default heir (S1) + liveness + time-weighted average
+    // --------------------------------------------------------------------
+
+    // Default heir per logical owner (last resort before burn when both sender+recipient are dead)
+    mapping(address => address) private _defaultHeir;
+
+    // "Alive" is defined ONLY by spend actions (transfer/revoke/kill-switch/metatx),
+    // NOT by receiving funds. Stored as last spend YEAR (Gregorian, UTC).
+
+    struct AvgState {
+        uint16 year; // current Gregorian year bucket (UTC)
+        uint64 lastTs; // last timestamp we accounted up to
+        uint256 acc; // accumulated (balance * dt) within current year
+        uint256 lastBal; // balance snapshot as-of lastTs
+    }
+
+    mapping(address => AvgState) private _avg;
+
+    event DefaultHeirSet(address indexed owner, address indexed heir);
+    event SpendTouched(address indexed owner, uint16 year);
+    event LotSwept(
+        address indexed recipient, uint256 indexed lotIndex, address indexed to, uint256 amount, bytes32 action
+    );
+
+    function defaultHeirOf(address owner) external view returns (address) {
+        return _defaultHeir[owner];
+    }
+
+    function lastSpendYearOf(address owner) external view returns (uint16) {}
 
     struct Lot {
         address senderOwner; // original sender (controls reduce/revoke)
@@ -251,6 +291,18 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     // --------------------------------------------------------------------
+    // Owner-receive safety: if someone sends/mints to an initialized owner address,
+    // redirect to its signingKey so funds are never trapped on owner-disabled address.
+    // --------------------------------------------------------------------
+    function _resolveRecipient(address to) internal view returns (address) {
+        if (to != address(0) && registry.isInitialized(to)) {
+            address sk = registry.signingKeyOf(to);
+            if (sk != address(0)) return sk;
+        }
+        return to;
+    }
+
+    // --------------------------------------------------------------------
     // Views
     // --------------------------------------------------------------------
 
@@ -302,6 +354,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
     function transfer(address to, uint256 amount) public override returns (bool) {
         require(!registry.isInitialized(msg.sender), "owner-disabled");
+        _touchSpend(msg.sender);
         _transferWithInheritance(msg.sender, to, amount, MIN_WAIT_SECONDS, bytes32(0));
         return true;
     }
@@ -329,9 +382,14 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Activation: one-shot initKeys + migrate full balance to signingKey
     // --------------------------------------------------------------------
 
-    function activateKeysAndMigrate(address signingKey, address revokeKey) external {
+    function _activateKeysAndMigrate(address signingKey, address revokeKey) internal {
         registry.initKeysFromAdmin(msg.sender, signingKey, revokeKey);
 
+        // enrollment: initialize annual bucket for inactivity tracking
+        _avgAccumulate(msg.sender);
+        // enrollment: start inactivity timer at activation
+        // enrollment: start inactivity timer at activation
+        // Enrollment: starting liveness timer at activation (so inactivity can be detected even if never spent)
         uint256 bal = balanceOf(msg.sender);
         if (bal > 0) {
             super._transfer(msg.sender, signingKey, bal);
@@ -347,6 +405,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
             _lots[signingKey].push(
                 Lot({
                     senderOwner: address(0),
+                    // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                    // forge-lint: disable-next-line(unsafe-typecast)
                     amount: uint128(bal),
                     createdAt: uint64(block.timestamp),
                     minUnlockTime: uint64(block.timestamp),
@@ -357,6 +417,28 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         }
     }
 
+    function activateKeysAndMigrate(address signingKey, address revokeKey) external {
+        _activateKeysAndMigrate(signingKey, revokeKey);
+    }
+
+    function activateKeysAndMigrateWithHeir(address signingKey, address revokeKey, address defaultHeir) external {
+        _activateKeysAndMigrate(signingKey, revokeKey);
+        if (defaultHeir != address(0)) {
+            _defaultHeir[msg.sender] = defaultHeir;
+            emit DefaultHeirSet(msg.sender, defaultHeir);
+        }
+    }
+
+    function revokeSetDefaultHeir(address owner, address newHeir) external {
+        // only the owner's revokeKey can change default heir (absolute power)
+        address rk = registry.revokeKeyOf(owner);
+        require(rk != address(0), "no-revoke");
+        require(msg.sender == rk, "not-revoke");
+        _defaultHeir[owner] = newHeir;
+        emit DefaultHeirSet(owner, newHeir);
+        // note: does NOT count as spend (no funds moved)
+    }
+
     function approve(address spender, uint256 amount) public override returns (bool) {
         require(!registry.isInitialized(msg.sender), "owner-disabled");
         return super.approve(spender, amount);
@@ -365,6 +447,108 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // --------------------------------------------------------------------
     // Sender controls (direct)
     // --------------------------------------------------------------------
+
+    // --------------------------------------------------------------------
+    // F2: permissionless sweep (post-unlock) for dead accounts + default heir S1
+    // --------------------------------------------------------------------
+
+    function sweepLot(address recipient, uint256 lotIndex) external {
+        Lot storage lot = _lots[recipient][lotIndex];
+        uint256 amount = uint256(lot.amount);
+        require(amount != 0, "empty-lot");
+
+        require(block.timestamp >= lot.unlockTime, "not-unlocked");
+
+        address recipOwner = _logicalOwnerOf(recipient);
+        require(_isDead(recipOwner), "recipient-alive");
+
+        address senderOwner = lot.senderOwner; // logical owner already stored
+        bool senderDead = (senderOwner == address(0)) ? true : _isDead(senderOwner);
+
+        lot.amount = 0;
+
+        if (!senderDead) {
+            // refund to sender (to its signingKey if exists, else to owner)
+            address refundTo = registry.signingKeyOf(senderOwner);
+            if (refundTo == address(0)) refundTo = senderOwner;
+
+            super._transfer(recipient, refundTo, amount);
+
+            // make refunded funds immediately spendable under refundTo
+            _lots[refundTo].push(
+                Lot({
+                    senderOwner: address(0),
+                    // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                    // forge-lint: disable-next-line(unsafe-typecast)
+                    amount: uint128(amount),
+                    createdAt: uint64(block.timestamp),
+                    minUnlockTime: uint64(block.timestamp),
+                    unlockTime: uint64(block.timestamp),
+                    characteristic: bytes32(0)
+                })
+            );
+
+            emit LotSwept(
+                recipient,
+                lotIndex,
+                refundTo,
+                amount, // safe literal tag
+                // forge-lint: disable-next-line(unsafe-typecast)
+                bytes32("REFUND")
+            );
+            return;
+        }
+
+        // both dead -> defaultHeir S1 (last resort) then burn
+        address heir = _defaultHeir[recipOwner];
+        if (heir != address(0)) {
+            address heirOwner = _logicalOwnerOf(heir);
+            if (!_isDead(heirOwner)) {
+                // send to heir; if heir is an initialized owner, _update redirect will push to its signing key.
+                super._transfer(recipient, heir, amount);
+
+                // also add immediate spendable lot to the actual receiver (heir or its signingKey after redirect)
+                address actual = heir;
+                if (registry.isInitialized(heir)) {
+                    address sk = registry.signingKeyOf(heir);
+                    if (sk != address(0)) actual = sk;
+                }
+                _lots[actual].push(
+                    Lot({
+                        senderOwner: address(0),
+                        // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                        // forge-lint: disable-next-line(unsafe-typecast)
+                        amount: uint128(amount),
+                        createdAt: uint64(block.timestamp),
+                        minUnlockTime: uint64(block.timestamp),
+                        unlockTime: uint64(block.timestamp),
+                        characteristic: bytes32(0)
+                    })
+                );
+
+                emit LotSwept(
+                    recipient,
+                    lotIndex,
+                    actual,
+                    amount, // safe literal tag
+                    // forge-lint: disable-next-line(unsafe-typecast)
+                    bytes32("HEIR")
+                );
+                return;
+            }
+        }
+
+        // burn
+        _burn(recipient, amount);
+        emit LotSwept(
+            recipient,
+            lotIndex,
+            address(0),
+            amount, // safe literal tag
+            // forge-lint: disable-next-line(unsafe-typecast)
+            bytes32("BURN")
+        );
+    }
 
     function reduceUnlockTime(address recipient, uint256 lotIndex, uint64 newUnlockTime) external {
         Lot storage lot = _lots[recipient][lotIndex];
@@ -389,6 +573,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function revoke(address recipient, uint256 lotIndex) external {
+        _touchSpend(msg.sender);
         Lot storage lot = _lots[recipient][lotIndex];
         uint256 amount = uint256(lot.amount);
 
@@ -414,6 +599,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         _lots[refundTo].push(
             Lot({
                 senderOwner: address(0),
+                // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amount: uint128(amount),
                 createdAt: uint64(block.timestamp),
                 minUnlockTime: uint64(block.timestamp),
@@ -429,6 +616,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Kill switch totale: revoke replaces signing AND migrates funds+lots
     // --------------------------------------------------------------------
     function revokeReplaceSigningAndMigrate(address owner, address newSigning) external {
+        _touchSpend(msg.sender);
         require(owner != address(0), "owner=0");
         require(newSigning != address(0), "signingKey=0");
 
@@ -491,6 +679,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         require(block.timestamp <= deadline, "expired");
         require(waitSeconds >= MIN_WAIT_SECONDS, "wait-too-short");
 
+        require(waitSeconds <= MAX_WAIT_SECONDS, "wait-too-long");
+        require(waitSeconds <= MAX_WAIT_SECONDS, "wait-too-long");
         uint256 nonce = registry.signingNonceOf(from);
 
         bytes32 structHash =
@@ -502,12 +692,110 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         require(signer == from, "bad-signature");
 
         registry.useSigningNonce(from, nonce);
+        _touchSpend(from);
         _transferWithInheritance(from, to, amount, waitSeconds, characteristic);
     }
 
     // --------------------------------------------------------------------
     // Internal mechanics
     // --------------------------------------------------------------------
+
+    function _logicalOwnerOf(address a) internal view returns (address) {
+        address o = registry.ownerOfSigningKey(a);
+        if (o != address(0)) return o;
+        return a;
+    }
+
+    function _isDead(address owner) internal view returns (bool) {
+        uint16 lastY = _lastSpendYear[owner];
+        if (lastY == 0) return false; // not enrolled / never spent => treat as alive until first spend sets it
+        uint16 nowY = uint256(block.timestamp).yearOf();
+        // dead if nowY >= lastY + INACTIVITY_YEARS
+        return nowY >= uint16(lastY + INACTIVITY_YEARS);
+    }
+
+    function _touchSpend(address actor) internal {
+        // actor can be signingKey or revokeKey; map to logical owner
+        address owner = _logicalOwnerOf(actor);
+        uint16 y = uint256(block.timestamp).yearOf();
+        emit SpendTouched(owner, y);
+    }
+
+    function _avgAccumulate(address a) internal {
+        if (a == address(0)) return;
+        AvgState storage st = _avg[a];
+        uint16 yNow = uint256(block.timestamp).yearOf();
+        uint64 tNow = uint64(block.timestamp);
+
+        if (st.lastTs == 0) {
+            st.year = yNow;
+            st.lastTs = tNow;
+            st.lastBal = balanceOf(a);
+            st.acc = 0;
+            return;
+        }
+
+        // if year changed, reset bucket (we keep only current-year running average)
+        if (st.year != yNow) {
+            st.year = yNow;
+            st.lastTs = tNow;
+            st.lastBal = balanceOf(a);
+            st.acc = 0;
+            return;
+        }
+
+        uint64 dt = tNow - st.lastTs;
+        if (dt > 0) {
+            st.acc += st.lastBal * uint256(dt);
+            st.lastTs = tNow;
+        }
+    }
+
+    function _avgSetBalance(address a) internal {
+        if (a == address(0)) return;
+        AvgState storage st = _avg[a];
+        uint16 yNow = uint256(block.timestamp).yearOf();
+        uint64 tNow = uint64(block.timestamp);
+
+        if (st.lastTs == 0) {
+            st.year = yNow;
+            st.lastTs = tNow;
+            st.lastBal = balanceOf(a);
+            st.acc = 0;
+            return;
+        }
+
+        // if year changed, reset
+        if (st.year != yNow) {
+            st.year = yNow;
+            st.lastTs = tNow;
+            st.lastBal = balanceOf(a);
+            st.acc = 0;
+            return;
+        }
+
+        st.lastBal = balanceOf(a);
+    }
+
+    function averageBalanceThisYear(address a) external view returns (uint256 avg) {
+        AvgState storage st = _avg[a];
+        if (st.lastTs == 0) return 0;
+        uint16 yNow = uint256(block.timestamp).yearOf();
+        if (st.year != yNow) return 0;
+
+        uint256 acc = st.acc;
+        uint256 bal = st.lastBal;
+        uint64 tNow = uint64(block.timestamp);
+        if (tNow > st.lastTs) {
+            acc += bal * uint256(tNow - st.lastTs);
+        }
+
+        uint256 yearStart = Gregorian.yearStartTs(yNow);
+        uint256 elapsed = (block.timestamp >= yearStart) ? (block.timestamp - yearStart) : 0;
+        if (elapsed == 0) return 0;
+
+        avg = acc / elapsed;
+    }
 
     function _transferWithInheritance(
         address sender,
@@ -516,6 +804,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 waitSeconds,
         bytes32 characteristic
     ) internal {
+        recipient = _resolveRecipient(recipient);
+
         // Resolve logical owner (if sender is signingKey)
         address ownerLogical = registry.ownerOfSigningKey(sender);
         if (ownerLogical == address(0)) ownerLogical = sender;
@@ -531,6 +821,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         _lots[recipient].push(
             Lot({
                 senderOwner: ownerLogical,
+                // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amount: uint128(amount),
                 createdAt: nowTs,
                 minUnlockTime: minUnlock,
@@ -568,6 +860,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 remaining -= lotAmt;
                 lot.amount = 0;
             } else {
+                // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                // forge-lint: disable-next-line(unsafe-typecast)
                 lot.amount = uint128(lotAmt - remaining);
                 remaining = 0;
             }
@@ -584,12 +878,15 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
+        to = _resolveRecipient(to);
         require(totalSupply() + amount <= MAX_SUPPLY, "cap exceeded");
         uint64 nowTs = uint64(block.timestamp);
 
         _lots[to].push(
             Lot({
                 senderOwner: address(0),
+                // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amount: uint128(amount),
                 createdAt: nowTs,
                 minUnlockTime: nowTs,
@@ -605,13 +902,21 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Central hook for ALL ERC20 balance moves (transfer/mint/burn)
     // If someone sends/mints to an initialized owner address, redirect to signingKey.
     // --------------------------------------------------------------------
-    function _update(address from, address to, uint256 amount) internal override {
-        if (to != address(0)) {
-            address sk = registry.signingKeyOf(to);
-            if (sk != address(0)) {
-                to = sk;
-            }
-        }
-        super._update(from, to, amount);
+
+    // --------------------------------------------------------------------
+    // Gregorian year calculation (UTC)
+
+    // --------------------------------------------------------------------
+    function _currentYear() internal view returns (uint16) {
+        // Unix timestamp -> Gregorian year approximation
+        // 1970-01-01 is year 1970
+        uint256 z = block.timestamp / 1 days + 719468;
+        uint256 era = (z >= 0 ? z : z - 146096) / 146097;
+        uint256 doe = z - era * 146097; // [0, 146096]
+        uint256 yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365; // [0,399]
+        uint256 y = yoe + era * 400;
+        // casting to uint16 is safe: Gregorian year will never approach uint16 max in any realistic chain lifetime
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint16(y);
     }
 }
