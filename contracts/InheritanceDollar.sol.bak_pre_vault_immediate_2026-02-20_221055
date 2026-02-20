@@ -49,6 +49,7 @@ contract INDKeyRegistry is AccessControl {
     event RevokeNonceUsed(address indexed owner, uint256 nonce);
 
     constructor(address admin) {
+
         require(admin != address(0), "admin=0");
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(REGISTRY_ADMIN_ROLE, admin);
@@ -313,6 +314,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         ERC20("Inheritance Dollar", "IND")
         ERC20Permit("Inheritance Dollar")
     {
+
         require(admin != address(0), "admin=0");
         require(address(keyRegistry) != address(0), "registry=0");
 
@@ -326,7 +328,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Owner-receive safety: if someone sends/mints to an initialized owner address,
     // redirect to its signingKey so funds are never trapped on owner-disabled address.
     // --------------------------------------------------------------------
-    function _resolveRecipient(address to) internal view returns (address) {
+                        function _resolveRecipient(address to) internal view returns (address) {
         if (to == address(0)) return to;
 
         // If logical owner initialized → redirect to signingKey
@@ -342,6 +344,11 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // Otherwise allow raw addresses (uninitialized owner or external address)
         return to;
     }
+
+
+
+
+
 
     // --------------------------------------------------------------------
     // Views

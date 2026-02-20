@@ -76,7 +76,7 @@ contract INDHandler is Test {
         uint256 j = _boundIdx(toSeed, owners.length);
 
         address from = _spenderOf(i);
-        address to   = owners[j];
+        address to = owners[j];
         if (from == to) return;
 
         uint256 spendable = ind.spendableBalanceOf(from);
@@ -88,17 +88,12 @@ contract INDHandler is Test {
         ind.transfer(to, amt);
     }
 
-    function act_transferWithInheritance(
-        uint256 fromSeed,
-        uint256 toSeed,
-        uint256 amtSeed,
-        uint256 waitSeed
-    ) external {
+    function act_transferWithInheritance(uint256 fromSeed, uint256 toSeed, uint256 amtSeed, uint256 waitSeed) external {
         uint256 i = _boundIdx(fromSeed, owners.length);
         uint256 j = _boundIdx(toSeed, owners.length);
 
         address from = _spenderOf(i);
-        address to   = owners[j];
+        address to = owners[j];
         if (from == to) return;
 
         uint256 spendable = ind.spendableBalanceOf(from);
@@ -131,7 +126,8 @@ contract INDHandler is Test {
         // Map ownerLogical -> its revoke caller by searching owners[]
         uint256 ownerIdx = type(uint256).max;
         for (uint256 k = 0; k < owners.length; k++) {
-            if (owners[k] == ownerLogical) { ownerIdx = k; break; }
+            if (owners[k] == ownerLogical) ownerIdx = k;
+            break;
         }
         if (ownerIdx == type(uint256).max) return;
 
@@ -164,7 +160,8 @@ contract INDHandler is Test {
 
         uint256 ownerIdx = type(uint256).max;
         for (uint256 k = 0; k < owners.length; k++) {
-            if (owners[k] == ownerLogical) { ownerIdx = k; break; }
+            if (owners[k] == ownerLogical) ownerIdx = k;
+            break;
         }
         if (ownerIdx == type(uint256).max) return;
 
@@ -175,6 +172,11 @@ contract INDHandler is Test {
     }
 
     // expose accounts to invariant test
-    function allOwners() external view returns (address[] memory) { return owners; }
-    function allSigningKeys() external view returns (address[] memory) { return signingKeys; }
+    function allOwners() external view returns (address[] memory) {
+        return owners;
+    }
+
+    function allSigningKeys() external view returns (address[] memory) {
+        return signingKeys;
+    }
 }

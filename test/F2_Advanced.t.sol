@@ -16,9 +16,9 @@ contract F2_Advanced_Test is Test {
 
     address bobOwner = address(0xB);
     address bobSigning = address(0x3333);
-    address bobRevoke  = address(0x4444);
+    address bobRevoke = address(0x4444);
 
-        function setUp() public {
+    function setUp() public {
         reg = new INDKeyRegistry(admin);
         ind = new InheritanceDollar(admin, reg);
 
