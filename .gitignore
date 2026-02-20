@@ -1,3 +1,8 @@
 out/
 cache/
 foundry.lock
+
+# local backups / artifacts
+contracts/*.bak.*
+gas_before.txt
+contracts/lib/
