@@ -883,27 +883,24 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         uint256 i = _head[owner];
         // consume only spendable lots, starting from head
-        for (; i < arr.length && remaining > 0; i++) {
+        for (; i < arr.length && remaining != 0; ) {
             Lot storage lot = arr[i];
 
-            // skip empty lots; they can be compacted by advancing head later
-            if (lot.amount == 0) continue;
-
-            // not yet unlocked => cannot spend from here or later unlocked ones,
-            // but we must continue scanning because later lots might already be unlocked
-            // (unlockTime is not guaranteed monotonic).
-            if (lot.unlockTime > nowTs) continue;
-
-            uint256 lotAmt = uint256(lot.amount);
-            if (lotAmt <= remaining) {
-                remaining -= lotAmt;
-                lot.amount = 0;
-            } else {
-                // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
-                // forge-lint: disable-next-line(unsafe-typecast)
-                lot.amount = uint128(lotAmt - remaining);
-                remaining = 0;
+            uint128 a = lot.amount;
+            if (a != 0 && lot.unlockTime <= nowTs) {
+                uint256 lotAmt = uint256(a);
+                if (lotAmt <= remaining) {
+                    remaining -= lotAmt;
+                    lot.amount = 0;
+                } else {
+                    // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                    // forge-lint: disable-next-line(unsafe-typecast)
+                    lot.amount = uint128(lotAmt - remaining);
+                    remaining = 0;
+                }
             }
+
+            unchecked { ++i; }
         }
 
         require(remaining == 0, "insufficient-spendable");
@@ -911,10 +908,11 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // advance head over leading empty lots to prevent unbounded growth costs
         uint256 h = _head[owner];
         while (h < arr.length && arr[h].amount == 0) {
-            h++;
+            unchecked { ++h; }
         }
         _head[owner] = h;
     }
+
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         to = _resolveRecipient(to);
