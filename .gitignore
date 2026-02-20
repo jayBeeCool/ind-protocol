@@ -6,3 +6,4 @@ foundry.lock
 contracts/*.bak.*
 gas_before.txt
 contracts/lib/
+*.bak_*
