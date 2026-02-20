@@ -428,8 +428,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         // enrollment: initialize annual bucket for inactivity tracking
         _avgAccumulate(msg.sender);
-        // enrollment: start inactivity timer at activation
-        // enrollment: start inactivity timer at activation
         // Enrollment: starting liveness timer at activation (so inactivity can be detected even if never spent)
         uint256 bal = balanceOf(msg.sender);
         if (bal > 0) {
