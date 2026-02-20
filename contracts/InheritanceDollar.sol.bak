@@ -40,7 +40,6 @@ contract INDKeyRegistry is AccessControl {
 
     mapping(address => Keys) private _keys;
     mapping(address => address) private _ownerOfSigning;
-    mapping(address => address) private _ownerOfRevoke;
 
     event KeysInitialized(address indexed owner, address indexed signingKey, address indexed revokeKey);
     event SigningKeyRotated(address indexed owner, address indexed oldKey, address indexed newKey, uint256 revokeNonce);
@@ -49,7 +48,6 @@ contract INDKeyRegistry is AccessControl {
     event RevokeNonceUsed(address indexed owner, uint256 nonce);
 
     constructor(address admin) {
-
         require(admin != address(0), "admin=0");
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(REGISTRY_ADMIN_ROLE, admin);
@@ -83,18 +81,11 @@ contract INDKeyRegistry is AccessControl {
         return _ownerOfSigning[signingKey];
     }
 
-    function ownerOfRevokeKey(address revokeKey) external view returns (address) {
-        return _ownerOfRevoke[revokeKey];
-    }
-
     // -------- Initialization --------
 
     function initKeys(address signingKey, address revokeKey) internal {
         require(signingKey != address(0), "signingKey=0");
         require(revokeKey != address(0), "revokeKey=0");
-        require(signingKey != revokeKey, "keys-equal");
-        require(_ownerOfSigning[signingKey] == address(0), "signingKey-in-use");
-        require(_ownerOfRevoke[revokeKey] == address(0), "revokeKey-in-use");
 
         Keys storage k = _keys[msg.sender];
         require(!k.initialized, "already-initialized");
@@ -106,7 +97,6 @@ contract INDKeyRegistry is AccessControl {
         k.initialized = true;
 
         _ownerOfSigning[signingKey] = msg.sender;
-        _ownerOfRevoke[revokeKey] = msg.sender;
 
         emit KeysInitialized(msg.sender, signingKey, revokeKey);
     }
@@ -115,7 +105,6 @@ contract INDKeyRegistry is AccessControl {
 
     function rotateSigning(address owner, address newSigning) external {
         require(newSigning != address(0), "signingKey=0");
-        require(_ownerOfSigning[newSigning] == address(0), "signingKey-in-use");
         Keys storage k = _keys[owner];
         require(k.initialized, "not-initialized");
         require(msg.sender == k.revokeKey, "not-revoke");
@@ -130,15 +119,10 @@ contract INDKeyRegistry is AccessControl {
 
     function rotateRevoke(address owner, address newRevoke) external {
         require(newRevoke != address(0), "revokeKey=0");
-        require(_ownerOfRevoke[newRevoke] == address(0), "revokeKey-in-use");
         Keys storage k = _keys[owner];
         require(k.initialized, "not-initialized");
         require(msg.sender == k.revokeKey, "not-revoke");
         address old = k.revokeKey;
-
-        delete _ownerOfRevoke[old];
-        _ownerOfRevoke[newRevoke] = owner;
-
         k.revokeKey = newRevoke;
         k.revokeNonce++;
         emit RevokeKeyRotated(owner, old, newRevoke, k.revokeNonce - 1);
@@ -151,9 +135,6 @@ contract INDKeyRegistry is AccessControl {
         require(owner != address(0), "owner=0");
         require(signingKey != address(0), "signingKey=0");
         require(revokeKey != address(0), "revokeKey=0");
-        require(signingKey != revokeKey, "keys-equal");
-        require(_ownerOfSigning[signingKey] == address(0), "signingKey-in-use");
-        require(_ownerOfRevoke[revokeKey] == address(0), "revokeKey-in-use");
 
         Keys storage k = _keys[owner];
         require(!k.initialized, "already-initialized");
@@ -164,7 +145,6 @@ contract INDKeyRegistry is AccessControl {
         k.revokeNonce = 0;
         k.initialized = true;
         _ownerOfSigning[signingKey] = owner;
-        _ownerOfRevoke[revokeKey] = owner;
 
         emit KeysInitialized(owner, signingKey, revokeKey);
     }
@@ -186,29 +166,17 @@ contract INDKeyRegistry is AccessControl {
     }
 
     function setSigningKeyFromAdmin(address owner, address newKey) external onlyRole(REGISTRY_ADMIN_ROLE) {
-        require(newKey != address(0), "signingKey=0");
-        require(_ownerOfSigning[newKey] == address(0), "signingKey-in-use");
         Keys storage k = _keys[owner];
         require(k.initialized, "not-initialized");
         address old = k.signingKey;
-
-        delete _ownerOfSigning[old];
-        _ownerOfSigning[newKey] = owner;
-
         k.signingKey = newKey;
         emit SigningKeyRotated(owner, old, newKey, k.revokeNonce);
     }
 
     function setRevokeKeyFromAdmin(address owner, address newKey) external onlyRole(REGISTRY_ADMIN_ROLE) {
-        require(newKey != address(0), "revokeKey=0");
-        require(_ownerOfRevoke[newKey] == address(0), "revokeKey-in-use");
         Keys storage k = _keys[owner];
         require(k.initialized, "not-initialized");
         address old = k.revokeKey;
-
-        delete _ownerOfRevoke[old];
-        _ownerOfRevoke[newKey] = owner;
-
         k.revokeKey = newKey;
         emit RevokeKeyRotated(owner, old, newKey, k.revokeNonce);
     }
@@ -314,12 +282,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         ERC20("Inheritance Dollar", "IND")
         ERC20Permit("Inheritance Dollar")
     {
-
         require(admin != address(0), "admin=0");
         require(address(keyRegistry) != address(0), "registry=0");
 
         registry = keyRegistry;
-
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(MINTER_ROLE, admin);
     }
@@ -328,27 +294,13 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Owner-receive safety: if someone sends/mints to an initialized owner address,
     // redirect to its signingKey so funds are never trapped on owner-disabled address.
     // --------------------------------------------------------------------
-                        function _resolveRecipient(address to) internal view returns (address) {
-        if (to == address(0)) return to;
-
-        // If logical owner initialized → redirect to signingKey
-        if (registry.isInitialized(to)) {
-            return registry.signingKeyOf(to);
+    function _resolveRecipient(address to) internal view returns (address) {
+        if (to != address(0) && registry.isInitialized(to)) {
+            address sk = registry.signingKeyOf(to);
+            if (sk != address(0)) return sk;
         }
-
-        // If valid signing key → allowed
-        if (registry.ownerOfSigningKey(to) != address(0)) {
-            return to;
-        }
-
-        // Otherwise allow raw addresses (uninitialized owner or external address)
         return to;
     }
-
-
-
-
-
 
     // --------------------------------------------------------------------
     // Views
