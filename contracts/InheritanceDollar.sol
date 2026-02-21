@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./lib/Gregorian.sol";
+import "./lib/IndBuckets1h.sol";
 
 /*
 Inheritance Dollar (IND)
@@ -217,6 +218,9 @@ contract INDKeyRegistry is AccessControl {
 /// Inheritance Dollar Token
 /// ------------------------------------------------------------------------
 contract InheritanceDollar is ERC20Permit, AccessControl {
+    using IndBuckets1h for IndBuckets1h.State;
+    IndBuckets1h.State private _b;
+
     using ECDSA for bytes32;
     using Gregorian for uint256;
 
