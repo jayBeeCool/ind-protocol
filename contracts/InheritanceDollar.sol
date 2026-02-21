@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./lib/Gregorian.sol";
 import "./lib/IndBuckets1h.sol";
+import "./lib/IndBuckets1hSweep.sol";
 
 /*
 Inheritance Dollar (IND)
@@ -219,6 +220,7 @@ contract INDKeyRegistry is AccessControl {
 /// ------------------------------------------------------------------------
 contract InheritanceDollar is ERC20Permit, AccessControl {
     using IndBuckets1h for IndBuckets1h.State;
+    using IndBuckets1hSweep for IndBuckets1h.State;
     IndBuckets1h.State private _b;
 
     using ECDSA for bytes32;
@@ -506,40 +508,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // F2: permissionless sweep (post-unlock) for dead accounts + default heir S1
     // --------------------------------------------------------------------
 
-    function sweepLot(address recipient, uint256 lotIndex) external {
-        Lot storage lot = _lots[recipient][lotIndex];
-        uint256 amount = uint256(lot.amount);
-        require(amount != 0, "empty-lot");
-
-        require(block.timestamp >= lot.unlockTime, "not-unlocked");
-
-        address recipOwner = _logicalOwnerOf(recipient);
-        require(_isDead(recipOwner), "recipient-alive");
-
-        address senderOwner = lot.senderOwner; // logical owner already stored
-        bool senderDead = (senderOwner == address(0)) ? true : _isDead(senderOwner);
-
-        lot.amount = 0;
-
-        if (!senderDead) {
-            // refund to sender (to its signingKey if exists, else to owner)
-            address refundTo = registry.signingKeyOf(senderOwner);
-            if (refundTo == address(0)) refundTo = senderOwner;
-
-            super._transfer(recipient, refundTo, amount);
-
-            // make refunded funds immediately spendable under refundTo
-            _lots[refundTo].push(
-                Lot({
-                    senderOwner: address(0),
-                    // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
-                    // forge-lint: disable-next-line(unsafe-typecast)
-                    amount: uint128(amount),
-                    createdAt: uint64(block.timestamp),
-                    minUnlockTime: uint64(block.timestamp),
-                    unlockTime: uint64(block.timestamp),
-                    characteristic: bytes32(0)
-                })
+    function sweepLot(address owner, uint256 lotIndex) external {
+        _b.removeLot(owner, lotIndex);
+    })
             );
 
             emit LotSwept(
