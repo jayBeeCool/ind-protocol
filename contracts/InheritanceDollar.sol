@@ -276,6 +276,38 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     mapping(address => Lot[]) private _lots;
     mapping(address => uint256) private _head;
 
+
+    // --------------------------------------------------------------------
+    // C-STEP: bucket 1h + spendable list index (keeps lotIndex ABI stable)
+    // --------------------------------------------------------------------
+    uint64 internal constant BUCKET_SECONDS = 3600; // 1h
+    uint32 internal constant NIL = 0;
+
+    // Per-lot index node (a lot is in exactly ONE list: either a locked bucket, or spendable list).
+    // bucketPlus1 == 0 => node not indexed (should not happen once created)
+    // bucketPlus1 == 1 => spendable list
+    // bucketPlus1 >= 2 => locked bucket (bucketKey = bucketPlus1-2)
+    struct LotNode {
+        uint32 prev;
+        uint32 next;
+        uint32 bucketPlus1;
+    }
+    mapping(address => mapping(uint256 => LotNode)) private _node; // ownerAddr => lotIndex => node
+
+    // spendable list per account: head/tail are lotIndex+1 (0 = NIL)
+    mapping(address => uint32) private _spHead;
+    mapping(address => uint32) private _spTail;
+
+    // locked bucket list per account:
+    // bucketKey is uint32 (unlockTimeRounded / 3600)
+    mapping(address => mapping(uint32 => uint32)) private _bHead; // bucketKey => head (lotIndex+1)
+    mapping(address => mapping(uint32 => uint32)) private _bTail;
+
+    // bucket-chain per account (only buckets that exist, sorted):
+    struct BucketLink { uint32 prev; uint32 next; bool exists; }
+    mapping(address => mapping(uint32 => BucketLink)) private _bucketLink;
+    mapping(address => uint32) private _bucketHead; // first bucketKey
+    mapping(address => uint32) private _bucketTail; // last bucketKey
     // -------- EIP-712 typehashes --------
     bytes32 private constant TRANSFER_TYPEHASH = keccak256(
         "TransferInheritance(address from,address to,uint256 amount,uint64 waitSeconds,bytes32 characteristic,uint256 nonce,uint256 deadline)"
