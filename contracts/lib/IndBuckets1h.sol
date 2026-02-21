@@ -24,6 +24,7 @@ library IndBuckets1h {
         // linking
         uint32 nextInBucket; // prossimo entry nella bucket-list
         uint32 nextSpendable; // prossimo entry nella spendable queue
+        bool inSpendable; // true se l'entry è nella spendable queue (post-roll)
     }
 
     struct Bucket {
@@ -143,7 +144,8 @@ library IndBuckets1h {
                     senderOwner: senderOwner,
                     characteristic: characteristic,
                     nextInBucket: 0,
-                    nextSpendable: 0
+                    nextSpendable: 0,
+                    inSpendable: false
                 })
             );
 
@@ -223,6 +225,13 @@ library IndBuckets1h {
             // append bucket's entry-chain into spendable queue
             uint32 h = bk.headEntry;
             if (h != 0) {
+                // mark entries as spendable
+                uint32 t = h;
+                while (t != 0) {
+                    ac.entries[t].inSpendable = true;
+                    if (t == bk.tailEntry) break;
+                    t = ac.entries[t].nextInBucket;
+                }
                 if (ac.spendHead == 0) {
                     ac.spendHead = h;
                     ac.spendTail = bk.tailEntry;
@@ -295,6 +304,131 @@ library IndBuckets1h {
                 break;
             }
         }
+    }
+
+    // -------------------------
+    // Admin/Bridge helpers
+    // -------------------------
+    function resetAccount(State storage st, address who) internal {
+        Account storage ac = st.a[who];
+        if (!ac.inited) {
+            ac.inited = true;
+            ac.entries.push(); // dummy
+            return;
+        }
+
+        ac.lockedHead = 0;
+        ac.lockedTail = 0;
+        ac.lockedTotal = 0;
+        ac.spendableTotal = 0;
+        ac.spendHead = 0;
+        ac.spendTail = 0;
+
+        for (uint256 i = 1; i < ac.entries.length; i++) {
+            ac.entries[i].amount = 0;
+            ac.entries[i].nextInBucket = 0;
+            ac.entries[i].nextSpendable = 0;
+            ac.entries[i].inSpendable = false;
+            ac.entries[i].unlockTime = 0;
+            ac.entries[i].minUnlockTime = 0;
+            ac.entries[i].senderOwner = address(0);
+            ac.entries[i].characteristic = bytes32(0);
+        }
+    }
+
+    function removeAmount(State storage st, address who, uint256 entryIndex, uint128 amount, uint64 nowTs) internal {
+        Account storage ac = st.a[who];
+        require(ac.inited, "no-entries");
+        require(entryIndex != 0 && entryIndex < ac.entries.length, "bad-index");
+
+        roll(st, who, nowTs);
+
+        Entry storage e = ac.entries[entryIndex];
+        require(e.amount >= amount, "bad-amount");
+        e.amount -= amount;
+
+        if (e.inSpendable) {
+            require(ac.spendableTotal >= uint256(amount), "spendable-underflow");
+            ac.spendableTotal -= uint256(amount);
+        } else {
+            uint64 bKey = _bucketKey(e.unlockTime);
+            Bucket storage bk = ac.locked[bKey];
+            if (bk.total >= amount) {
+                bk.total -= amount;
+            } else {
+                bk.total = 0;
+            }
+            if (ac.lockedTotal >= uint256(amount)) {
+                ac.lockedTotal -= uint256(amount);
+            } else {
+                ac.lockedTotal = 0;
+            }
+        }
+    }
+
+    function reduceUnlockTime(State storage st, address who, uint256 entryIndex, uint64 newUnlockTime, uint64 nowTs)
+        internal
+    {
+        Account storage ac = st.a[who];
+        require(ac.inited, "no-entries");
+        require(entryIndex != 0 && entryIndex < ac.entries.length, "bad-index");
+
+        roll(st, who, nowTs);
+
+        Entry storage e = ac.entries[entryIndex];
+        require(!e.inSpendable, "already-spendable");
+        require(e.amount != 0, "empty-entry");
+        require(newUnlockTime < e.unlockTime, "not-reduction");
+        require(newUnlockTime >= e.minUnlockTime, "below-min");
+
+        uint64 oldB = _bucketKey(e.unlockTime);
+        uint64 newB = _bucketKey(newUnlockTime);
+        if (oldB == newB) {
+            e.unlockTime = newUnlockTime;
+            return;
+        }
+
+        // decrement old bucket total
+        Bucket storage oldBk = ac.locked[oldB];
+        if (oldBk.total >= e.amount) oldBk.total -= e.amount;
+        else oldBk.total = 0;
+
+        // unlink from old bucket entry-chain (scan)
+        uint32 prev = 0;
+        uint32 cur = oldBk.headEntry;
+        while (cur != 0 && cur != uint32(entryIndex)) {
+            prev = cur;
+            cur = ac.entries[cur].nextInBucket;
+        }
+        if (cur == 0) {
+            // if missing, just update unlockTime and reinsert
+            e.unlockTime = newUnlockTime;
+        } else {
+            uint32 nxt = ac.entries[cur].nextInBucket;
+            if (prev == 0) {
+                oldBk.headEntry = nxt;
+            } else {
+                ac.entries[prev].nextInBucket = nxt;
+            }
+            if (oldBk.tailEntry == uint32(entryIndex)) {
+                oldBk.tailEntry = prev;
+            }
+            ac.entries[cur].nextInBucket = 0;
+            e.unlockTime = newUnlockTime;
+        }
+
+        // insert into new bucket (append)
+        Bucket storage nb = ac.locked[newB];
+        if (nb.headEntry == 0) {
+            _insertBucketSorted(ac, newB);
+            nb.headEntry = uint32(entryIndex);
+            nb.tailEntry = uint32(entryIndex);
+        } else {
+            ac.entries[nb.tailEntry].nextInBucket = uint32(entryIndex);
+            nb.tailEntry = uint32(entryIndex);
+        }
+        nb.total += e.amount;
+        // lockedTotal unchanged (amount stayed locked)
     }
 
     // -------------------------
