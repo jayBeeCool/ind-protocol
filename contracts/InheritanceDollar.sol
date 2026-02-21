@@ -719,7 +719,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         require(waitSeconds >= MIN_WAIT_SECONDS, "wait-too-short");
 
         require(waitSeconds <= MAX_WAIT_SECONDS, "wait-too-long");
-        require(waitSeconds <= MAX_WAIT_SECONDS, "wait-too-long");
         uint256 nonce = registry.signingNonceOf(from);
 
         bytes32 structHash =
