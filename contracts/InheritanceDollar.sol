@@ -861,6 +861,15 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 minUnlock = nowTs + MIN_WAIT_SECONDS;
         uint64 unlockAt = nowTs + waitSeconds;
 
+        _b.addIncoming(
+            recipient,
+            uint128(amount),
+            minUnlock,
+            unlockAt,
+            ownerLogical,
+            characteristic
+        );
+
         _lots[recipient].push(
             Lot({
                 senderOwner: ownerLogical,
