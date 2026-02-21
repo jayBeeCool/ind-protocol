@@ -937,6 +937,14 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         );
 
         _mint(to, amount);
+        _b.addIncoming(
+            to,
+            uint128(amount),
+            nowTs,
+            nowTs,
+            address(0),
+            bytes32(0)
+        );
     }
 
     // --------------------------------------------------------------------
