@@ -359,7 +359,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
             }
             _head[msg.sender] = oldLots.length;
             // make migrated funds immediately spendable under signingKey
-            uint64 nowTs = uint64(block.timestamp);
+            uint64 nowTs = nowTs;
 
             // legacy lots (keep F2 source-of-truth during bridge)
             _lots[signingKey].push(
@@ -451,9 +451,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                         // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
                         // forge-lint: disable-next-line(unsafe-typecast)
                         amount: uint128(amount),
-                        createdAt: uint64(block.timestamp),
-                        minUnlockTime: uint64(block.timestamp),
-                        unlockTime: uint64(block.timestamp),
+                        createdAt: nowTs,
+                        minUnlockTime: nowTs,
+                        unlockTime: nowTs,
                         characteristic: bytes32(0)
                     })
                 );
@@ -534,9 +534,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
                 // forge-lint: disable-next-line(unsafe-typecast)
                 amount: uint128(amount),
-                createdAt: uint64(block.timestamp),
-                minUnlockTime: uint64(block.timestamp),
-                unlockTime: uint64(block.timestamp),
+                createdAt: nowTs,
+                minUnlockTime: nowTs,
+                unlockTime: nowTs,
                 characteristic: bytes32(0)
             })
         );
@@ -657,7 +657,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         if (a == address(0)) return;
         AvgState storage st = _avg[a];
         uint16 yNow = uint256(block.timestamp).yearOf();
-        uint64 tNow = uint64(block.timestamp);
+        uint64 tNow = nowTs;
 
         if (st.lastTs == 0) {
             st.year = yNow;
@@ -687,7 +687,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         if (a == address(0)) return;
         AvgState storage st = _avg[a];
         uint16 yNow = uint256(block.timestamp).yearOf();
-        uint64 tNow = uint64(block.timestamp);
+        uint64 tNow = nowTs;
 
         if (st.lastTs == 0) {
             st.year = yNow;
@@ -717,7 +717,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         uint256 acc = st.acc;
         uint256 bal = st.lastBal;
-        uint64 tNow = uint64(block.timestamp);
+        uint64 tNow = nowTs;
         if (tNow > st.lastTs) {
             acc += bal * uint256(tNow - st.lastTs);
         }
@@ -746,7 +746,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         _consumeSpendableLots(sender, amount);
 
-        uint64 nowTs = uint64(block.timestamp);
+        uint64 nowTs = nowTs;
         uint64 minUnlock = nowTs + MIN_WAIT_SECONDS;
         uint64 unlockAt = nowTs + waitSeconds;
 
@@ -774,7 +774,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     function _consumeSpendableLots(address owner, uint256 amount) internal {
         Lot[] storage arr = _lots[owner];
         uint256 remaining = amount;
-        uint64 nowTs = uint64(block.timestamp);
+        uint64 nowTs = nowTs;
 
         uint256 i = _head[owner];
         for (; i < arr.length && remaining != 0; ) {
@@ -812,7 +812,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         to = _resolveRecipient(to);
         require(totalSupply() + amount <= MAX_SUPPLY, "cap exceeded");
-        uint64 nowTs = uint64(block.timestamp);
+        uint64 nowTs = nowTs;
 
         _lots[to].push(
             Lot({
