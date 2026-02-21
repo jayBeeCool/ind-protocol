@@ -10,8 +10,8 @@ contract InvariantTest is Test {
 
     address admin = address(0xA11CE);
     address alice = address(0xA);
-    address bob   = address(0xB);
-    address carl  = address(0xC);
+    address bob = address(0xB);
+    address carl = address(0xC);
 
     function setUp() public {
         vm.startPrank(admin);

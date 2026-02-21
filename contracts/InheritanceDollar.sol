@@ -49,7 +49,6 @@ contract INDKeyRegistry is AccessControl {
     event RevokeNonceUsed(address indexed owner, uint256 nonce);
 
     constructor(address admin) {
-
         require(admin != address(0), "admin=0");
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(REGISTRY_ADMIN_ROLE, admin);
@@ -314,7 +313,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         ERC20("Inheritance Dollar", "IND")
         ERC20Permit("Inheritance Dollar")
     {
-
         require(admin != address(0), "admin=0");
         require(address(keyRegistry) != address(0), "registry=0");
 
@@ -328,7 +326,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Owner-receive safety: if someone sends/mints to an initialized owner address,
     // redirect to its signingKey so funds are never trapped on owner-disabled address.
     // --------------------------------------------------------------------
-                        function _resolveRecipient(address to) internal view returns (address) {
+    function _resolveRecipient(address to) internal view returns (address) {
         if (to == address(0)) return to;
 
         // If logical owner initialized → redirect to signingKey
@@ -344,11 +342,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // Otherwise allow raw addresses (uninitialized owner or external address)
         return to;
     }
-
-
-
-
-
 
     // --------------------------------------------------------------------
     // Views
@@ -435,8 +428,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         // enrollment: initialize annual bucket for inactivity tracking
         _avgAccumulate(msg.sender);
-        // enrollment: start inactivity timer at activation
-        // enrollment: start inactivity timer at activation
         // Enrollment: starting liveness timer at activation (so inactivity can be detected even if never spent)
         uint256 bal = balanceOf(msg.sender);
         if (bal > 0) {
@@ -892,27 +883,24 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         uint256 i = _head[owner];
         // consume only spendable lots, starting from head
-        for (; i < arr.length && remaining > 0; i++) {
+        for (; i < arr.length && remaining != 0; ) {
             Lot storage lot = arr[i];
 
-            // skip empty lots; they can be compacted by advancing head later
-            if (lot.amount == 0) continue;
-
-            // not yet unlocked => cannot spend from here or later unlocked ones,
-            // but we must continue scanning because later lots might already be unlocked
-            // (unlockTime is not guaranteed monotonic).
-            if (lot.unlockTime > nowTs) continue;
-
-            uint256 lotAmt = uint256(lot.amount);
-            if (lotAmt <= remaining) {
-                remaining -= lotAmt;
-                lot.amount = 0;
-            } else {
-                // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
-                // forge-lint: disable-next-line(unsafe-typecast)
-                lot.amount = uint128(lotAmt - remaining);
-                remaining = 0;
+            uint128 a = lot.amount;
+            if (a != 0 && lot.unlockTime <= nowTs) {
+                uint256 lotAmt = uint256(a);
+                if (lotAmt <= remaining) {
+                    remaining -= lotAmt;
+                    lot.amount = 0;
+                } else {
+                    // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                    // forge-lint: disable-next-line(unsafe-typecast)
+                    lot.amount = uint128(lotAmt - remaining);
+                    remaining = 0;
+                }
             }
+
+            unchecked { ++i; }
         }
 
         require(remaining == 0, "insufficient-spendable");
@@ -920,10 +908,11 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // advance head over leading empty lots to prevent unbounded growth costs
         uint256 h = _head[owner];
         while (h < arr.length && arr[h].amount == 0) {
-            h++;
+            unchecked { ++h; }
         }
         _head[owner] = h;
     }
+
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         to = _resolveRecipient(to);

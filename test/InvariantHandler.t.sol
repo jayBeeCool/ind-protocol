@@ -14,9 +14,9 @@ contract InvariantHandlerTest is StdInvariant, Test {
     address admin = address(0xA11CE);
 
     address alice = address(0xA);
-    address bob   = address(0xB);
-    address carl  = address(0xC);
-    address dana  = address(0xD);
+    address bob = address(0xB);
+    address carl = address(0xC);
+    address dana = address(0xD);
 
     function setUp() public {
         vm.startPrank(admin);
@@ -46,9 +46,9 @@ contract InvariantHandlerTest is StdInvariant, Test {
         handler = new INDHandler(ind, reg, admin, owners, signings, revokes);
 
         ind.mint(alice, 1_000_000 ether);
-        ind.mint(bob,   1_000_000 ether);
-        ind.mint(carl,  1_000_000 ether);
-        ind.mint(dana,  1_000_000 ether);
+        ind.mint(bob, 1_000_000 ether);
+        ind.mint(carl, 1_000_000 ether);
+        ind.mint(dana, 1_000_000 ether);
 
         vm.stopPrank();
 
