@@ -17,3 +17,8 @@ contracts/lib/
 *.swp
 *.tmp
 .DS_Store
+
+# local backups (never commit)
+contracts/*.bak
+contracts/*.bak.*
+contracts/*~ 
