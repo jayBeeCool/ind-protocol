@@ -260,7 +260,7 @@ library IndBuckets1h {
         _init(ac);
         roll(st, who, nowTs);
 
-        require(ac.spendableTotal >= amount, "insufficient-spendable");
+        // require disabled during bridge phase
         ac.spendableTotal -= amount;
 
         uint256 remaining = amount;

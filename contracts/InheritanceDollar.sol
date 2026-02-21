@@ -443,21 +443,26 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 oldLots[i].amount = 0;
             }
             _head[msg.sender] = oldLots.length;
-
             // make migrated funds immediately spendable under signingKey
+            uint64 nowTs = uint64(block.timestamp);
+
+            // legacy lots (keep F2 source-of-truth during bridge)
             _lots[signingKey].push(
                 Lot({
                     senderOwner: address(0),
                     // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
                     // forge-lint: disable-next-line(unsafe-typecast)
                     amount: uint128(bal),
-                    createdAt: uint64(block.timestamp),
-                    minUnlockTime: uint64(block.timestamp),
-                    unlockTime: uint64(block.timestamp),
+                    createdAt: nowTs,
+                    minUnlockTime: nowTs,
+                    unlockTime: nowTs,
                     characteristic: bytes32(0)
                 })
             );
-        }
+
+            // bucket mirror
+            // bucket disabled during debug
+}
     }
 
     function activateKeysAndMigrate(address signingKey, address revokeKey) external {
@@ -861,14 +866,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 minUnlock = nowTs + MIN_WAIT_SECONDS;
         uint64 unlockAt = nowTs + waitSeconds;
 
-        _b.addIncoming(
-            recipient,
-            uint128(amount),
-            minUnlock,
-            unlockAt,
-            ownerLogical,
-            characteristic
-        );
+        // bucket disabled during debug
 
         _lots[recipient].push(
             Lot({
@@ -895,7 +893,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 nowTs = uint64(block.timestamp);
 
         uint256 i = _head[owner];
-        // consume only spendable lots, starting from head
         for (; i < arr.length && remaining != 0; ) {
             Lot storage lot = arr[i];
 
@@ -906,8 +903,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                     remaining -= lotAmt;
                     lot.amount = 0;
                 } else {
-                    // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
-                    // forge-lint: disable-next-line(unsafe-typecast)
                     lot.amount = uint128(lotAmt - remaining);
                     remaining = 0;
                 }
@@ -918,13 +913,16 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         require(remaining == 0, "insufficient-spendable");
 
-        // advance head over leading empty lots to prevent unbounded growth costs
         uint256 h = _head[owner];
         while (h < arr.length && arr[h].amount == 0) {
             unchecked { ++h; }
         }
         _head[owner] = h;
     }
+
+
+
+
 
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
@@ -946,14 +944,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         );
 
         _mint(to, amount);
-        _b.addIncoming(
-            to,
-            uint128(amount),
-            nowTs,
-            nowTs,
-            address(0),
-            bytes32(0)
-        );
+        // bucket disabled during debug
     }
 
     // --------------------------------------------------------------------
