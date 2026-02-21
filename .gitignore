@@ -5,7 +5,6 @@ foundry.lock
 # local backups / artifacts
 contracts/*.bak.*
 gas_before.txt
-contracts/lib/
 *.bak_*
 
 # --- generated/backup/editor junk ---
