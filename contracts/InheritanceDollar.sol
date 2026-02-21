@@ -883,7 +883,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         uint256 i = _head[owner];
         // consume only spendable lots, starting from head
-        for (; i < arr.length && remaining != 0; ) {
+        for (; i < arr.length && remaining != 0;) {
             Lot storage lot = arr[i];
 
             uint128 a = lot.amount;
@@ -900,7 +900,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 }
             }
 
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
 
         require(remaining == 0, "insufficient-spendable");
@@ -908,11 +910,12 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // advance head over leading empty lots to prevent unbounded growth costs
         uint256 h = _head[owner];
         while (h < arr.length && arr[h].amount == 0) {
-            unchecked { ++h; }
+            unchecked {
+                ++h;
+            }
         }
         _head[owner] = h;
     }
-
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         to = _resolveRecipient(to);
