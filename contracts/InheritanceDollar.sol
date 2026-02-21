@@ -360,30 +360,14 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function spendableBalanceOf(address account) public view returns (uint256) {
-        Lot[] storage arr = _lots[account];
-        uint256 sum;
-        uint64 nowTs = uint64(block.timestamp);
-
-        for (uint256 i = _head[account]; i < arr.length; i++) {
-            if (arr[i].amount != 0 && arr[i].unlockTime <= nowTs) {
-                sum += uint256(arr[i].amount);
-            }
-        }
-        return sum;
+        return _b.spendableOf(account, uint64(block.timestamp));
     }
+
 
     function lockedBalanceOf(address account) public view returns (uint256) {
-        Lot[] storage arr = _lots[account];
-        uint256 sum;
-        uint64 nowTs = uint64(block.timestamp);
-
-        for (uint256 i = _head[account]; i < arr.length; i++) {
-            if (arr[i].amount != 0 && arr[i].unlockTime > nowTs) {
-                sum += uint256(arr[i].amount);
-            }
-        }
-        return sum;
+        return _b.lockedOf(account, uint64(block.timestamp));
     }
+
 
     function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
         public
