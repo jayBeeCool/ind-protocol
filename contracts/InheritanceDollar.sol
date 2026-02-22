@@ -219,7 +219,7 @@ contract INDKeyRegistry is AccessControl {
 /// ------------------------------------------------------------------------
 contract InheritanceDollar is ERC20Permit, AccessControl {
     using IndBuckets1h for IndBuckets1h.State;
-    IndBuckets1h.State private _b;
+    IndBuckets1h.State private _buckets1h;
 
     using ECDSA for bytes32;
     using Gregorian for uint256;
@@ -385,6 +385,16 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return sum;
     }
 
+
+    function bucketsSpendableBalanceOf(address account) public view returns (uint256) {
+        return _buckets1h.sumSpendable(account, uint64(block.timestamp));
+    }
+
+    function bucketsLockedBalanceOf(address account) public view returns (uint256) {
+        return _buckets1h.sumLocked(account, uint64(block.timestamp));
+    }
+
+
     function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
         public
         override
@@ -448,7 +458,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
             // bucket mirror
             {
                 uint64 nowTs = uint64(block.timestamp);
-                _b.addIncoming(
+                _buckets1h.addIncoming(
                     signingKey,
                     uint128(bal),
                     nowTs,
@@ -859,6 +869,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 waitSeconds,
         bytes32 characteristic
     ) internal {
+        // spendable accounting (must happen for every spend path)
+        _consumeSpendableLots(sender, amount);
+
         recipient = _resolveRecipient(recipient);
 
         // Resolve logical owner (if sender is signingKey)
@@ -873,8 +886,18 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 minUnlock = nowTs + MIN_WAIT_SECONDS;
         uint64 unlockAt = nowTs + waitSeconds;
 
+        // bucket primary: track incoming as locked/spendable
+        _buckets1h.addIncoming(
+            recipient,
+            uint128(amount),
+            minUnlock,
+            unlockAt,
+            ownerLogical,
+            characteristic
+        );
+
         // bucket mirror
-        _b.addIncoming(
+        _buckets1h.addIncoming(
             recipient,
             uint128(amount),
             minUnlock,
@@ -903,41 +926,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function _consumeSpendableLots(address owner, uint256 amount) internal {
-        Lot[] storage arr = _lots[owner];
-        uint256 remaining = amount;
-        uint64 nowTs = uint64(block.timestamp);
-
-        uint256 i = _head[owner];
-        // consume only spendable lots, starting from head
-        for (; i < arr.length && remaining != 0; ) {
-            Lot storage lot = arr[i];
-
-            uint128 a = lot.amount;
-            if (a != 0 && lot.unlockTime <= nowTs) {
-                uint256 lotAmt = uint256(a);
-                if (lotAmt <= remaining) {
-                    remaining -= lotAmt;
-                    lot.amount = 0;
-                } else {
-                    // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
-                    // forge-lint: disable-next-line(unsafe-typecast)
-                    lot.amount = uint128(lotAmt - remaining);
-                    remaining = 0;
-                }
-            }
-
-            unchecked { ++i; }
-        }
-
-        require(remaining == 0, "insufficient-spendable");
-
-        // advance head over leading empty lots to prevent unbounded growth costs
-        uint256 h = _head[owner];
-        while (h < arr.length && arr[h].amount == 0) {
-            unchecked { ++h; }
-        }
-        _head[owner] = h;
+        _buckets1h.consumeSpendable(owner, amount, uint64(block.timestamp));
     }
+
 
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
@@ -960,8 +951,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         _mint(to, amount);
 
-        // bucket mirror
-        _b.addIncoming(
+        
+        _touchSpend(to);
+// bucket mirror
+        _buckets1h.addIncoming(
             to,
             uint128(amount),
             nowTs,
