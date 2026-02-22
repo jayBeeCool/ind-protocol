@@ -873,6 +873,16 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 minUnlock = nowTs + MIN_WAIT_SECONDS;
         uint64 unlockAt = nowTs + waitSeconds;
 
+        // bucket primary: track incoming as locked/spendable
+        _b.addIncoming(
+            recipient,
+            uint128(amount),
+            minUnlock,
+            unlockAt,
+            ownerLogical,
+            characteristic
+        );
+
         // bucket mirror
         _b.addIncoming(
             recipient,
@@ -903,41 +913,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function _consumeSpendableLots(address owner, uint256 amount) internal {
-        Lot[] storage arr = _lots[owner];
-        uint256 remaining = amount;
-        uint64 nowTs = uint64(block.timestamp);
-
-        uint256 i = _head[owner];
-        // consume only spendable lots, starting from head
-        for (; i < arr.length && remaining != 0; ) {
-            Lot storage lot = arr[i];
-
-            uint128 a = lot.amount;
-            if (a != 0 && lot.unlockTime <= nowTs) {
-                uint256 lotAmt = uint256(a);
-                if (lotAmt <= remaining) {
-                    remaining -= lotAmt;
-                    lot.amount = 0;
-                } else {
-                    // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
-                    // forge-lint: disable-next-line(unsafe-typecast)
-                    lot.amount = uint128(lotAmt - remaining);
-                    remaining = 0;
-                }
-            }
-
-            unchecked { ++i; }
-        }
-
-        require(remaining == 0, "insufficient-spendable");
-
-        // advance head over leading empty lots to prevent unbounded growth costs
-        uint256 h = _head[owner];
-        while (h < arr.length && arr[h].amount == 0) {
-            unchecked { ++h; }
-        }
-        _head[owner] = h;
+        _b.consumeSpendable(owner, amount, uint64(block.timestamp));
     }
+
 
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
