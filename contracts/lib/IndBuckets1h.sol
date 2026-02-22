@@ -456,4 +456,50 @@ library IndBuckets1h {
         ac.entries[entryIndex].amount = 0;
         // next pointers left as-is (safe); queue advancement happens on spend/roll
     }
+
+    function sumSpendable(State storage st, address account, uint64 nowTs) internal view returns (uint256 sum) {
+        Account storage ac = st.accounts[account];
+        // spendable entries live in spendable list
+        uint32 e = ac.spHead;
+        while (e != 0) {
+            Entry storage en = ac.entries[e];
+            sum += uint256(en.amount);
+            e = en.nextInBucket;
+        }
+        // also unlocked buckets (<= nowTs) are considered spendable
+        uint32 bk = ac.bucketHead;
+        while (bk != 0) {
+            Bucket storage b = ac.buckets[bk];
+            if (b.unlockAt > nowTs) break;
+            uint32 x = b.headEntry;
+            while (x != 0) {
+                Entry storage ex = ac.entries[x];
+                sum += uint256(ex.amount);
+                x = ex.nextInBucket;
+            }
+            bk = ac.bucketLink[bk].next;
+        }
+        return sum;
+    }
+
+    function sumLocked(State storage st, address account, uint64 nowTs) internal view returns (uint256 sum) {
+        Account storage ac = st.accounts[account];
+        // locked buckets are those with unlockAt > nowTs
+        uint32 bk = ac.bucketHead;
+        while (bk != 0) {
+            Bucket storage b = ac.buckets[bk];
+            if (b.unlockAt > nowTs) {
+                uint32 x = b.headEntry;
+                while (x != 0) {
+                    Entry storage ex = ac.entries[x];
+                    sum += uint256(ex.amount);
+                    x = ex.nextInBucket;
+                }
+            }
+            bk = ac.bucketLink[bk].next;
+        }
+        return sum;
+    }
+
+
 }
