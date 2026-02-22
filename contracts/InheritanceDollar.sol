@@ -49,7 +49,6 @@ contract INDKeyRegistry is AccessControl {
     event RevokeNonceUsed(address indexed owner, uint256 nonce);
 
     constructor(address admin) {
-
         require(admin != address(0), "admin=0");
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(REGISTRY_ADMIN_ROLE, admin);
@@ -226,6 +225,24 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Anti-abuse: cap maximum inheritance wait (upper bound; includes leap years)
     uint64 public constant MAX_WAIT_SECONDS = uint64(50 * 366 days);
 
+    // Liveness: an account is considered "dead" after N Gregorian years without (send OR keepAlive signature).
+    uint16 public constant LIVENESS_YEARS = 7;
+
+    // last activity timestamp (UTC seconds). Updated on send paths and on keepAlive().
+    mapping(address => uint256) internal _lastAliveTs;
+
+    // Average-balance accumulator within the current year (UTC).
+    // We track a time-weighted integral acc = Σ (balance * dt) for the owner, reset at Jan 1.
+    mapping(address => uint256) internal _avgAcc;
+    mapping(address => uint256) internal _avgLastTs;
+    mapping(address => uint16) internal _avgYear;
+
+    // Signed average snapshot per year (optional offchain reminder):
+    mapping(address => mapping(uint16 => uint256)) internal _avgSigned;
+
+    // Default heir (last resort) for "both dead" situations.
+    mapping(address => address) internal _defaultHeir;
+
     // Liveness tracking: last year an owner signed/spent
     mapping(address => uint16) internal _lastSpendYear;
     uint16 public constant INACTIVITY_YEARS = 7;
@@ -314,7 +331,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         ERC20("Inheritance Dollar", "IND")
         ERC20Permit("Inheritance Dollar")
     {
-
         require(admin != address(0), "admin=0");
         require(address(keyRegistry) != address(0), "registry=0");
 
@@ -328,7 +344,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Owner-receive safety: if someone sends/mints to an initialized owner address,
     // redirect to its signingKey so funds are never trapped on owner-disabled address.
     // --------------------------------------------------------------------
-                        function _resolveRecipient(address to) internal view returns (address) {
+    function _resolveRecipient(address to) internal view returns (address) {
         if (to == address(0)) return to;
 
         // If logical owner initialized → redirect to signingKey
@@ -344,11 +360,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // Otherwise allow raw addresses (uninitialized owner or external address)
         return to;
     }
-
-
-
-
-
 
     // --------------------------------------------------------------------
     // Views
@@ -400,9 +411,117 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Transfers (direct)
     // --------------------------------------------------------------------
 
+    // -------------------------
+    // Liveness + Avg accounting
+    // -------------------------
+
+    function _logicalOwnerOf(address who) internal view returns (address) {
+        // if who is a signingKey, map to its owner; else itself
+        address o = registry.ownerOfSigningKey(who);
+        return (o == address(0)) ? who : o;
+    }
+
+    function _isDead(address owner) internal view returns (bool) {
+        uint256 t = _lastAliveTs[owner];
+        if (t == 0) return false; // never used -> treat alive until first touch (safe default)
+        uint256 deadline = Gregorian.addYears(t, LIVENESS_YEARS);
+        return block.timestamp >= deadline;
+    }
+
+    function _avgAccumulate(address who) internal {
+        address owner = _logicalOwnerOf(who);
+
+        uint16 yNow = Gregorian.year(block.timestamp);
+        uint256 lastTs = _avgLastTs[owner];
+        uint16 yPrev = _avgYear[owner];
+
+        // first-touch guard
+        if (lastTs == 0) {
+            _avgYear[owner] = yNow;
+            _avgLastTs[owner] = block.timestamp;
+            return;
+        }
+
+        // if year changed, reset accumulator at Jan 1 of current year
+        if (yPrev != yNow) {
+            _avgAcc[owner] = 0;
+            _avgYear[owner] = yNow;
+            _avgLastTs[owner] = block.timestamp;
+            return;
+        }
+
+        // integrate balance * dt
+        uint256 dt = block.timestamp > lastTs ? (block.timestamp - lastTs) : 0;
+        if (dt != 0) {
+            uint256 bal = balanceOf(who);
+            _avgAcc[owner] += bal * dt;
+            _avgLastTs[owner] = block.timestamp;
+        }
+    }
+
+    function averageBalanceSoFar(address who) public view returns (uint256 avg) {
+        address owner = _logicalOwnerOf(who);
+        uint16 yNow = Gregorian.year(block.timestamp);
+        uint256 yearStart = Gregorian.yearStartTs(yNow);
+        uint256 elapsed = block.timestamp > yearStart ? (block.timestamp - yearStart) : 0;
+        if (elapsed == 0) return 0;
+
+        uint256 acc = _avgAcc[owner];
+        uint256 lastTs = _avgLastTs[owner];
+
+        // include virtual accumulation up to now (view)
+        if (_avgYear[owner] == yNow && lastTs != 0 && block.timestamp > lastTs) {
+            uint256 dt = block.timestamp - lastTs;
+            uint256 bal = balanceOf(who);
+            acc += bal * dt;
+        }
+
+        return acc / elapsed;
+    }
+
+    function _touchAlive(address who) internal {
+        address owner = _logicalOwnerOf(who);
+        _lastAliveTs[owner] = block.timestamp;
+        _avgAccumulate(who);
+    }
+
+    /// @notice On-chain keep-alive: sign avg for current year (reminder mechanism).
+    /// @dev This is NOT required to transfer; it exists as a "proof of life" without moving funds.
+    function keepAlive(uint256 avgSigned, uint8 v, bytes32 r, bytes32 s_) external {
+        address owner = _logicalOwnerOf(msg.sender);
+        uint16 y = Gregorian.year(block.timestamp);
+
+        // Domain-separated message (simple & deterministic, no EIP712 dependency):
+        bytes32 h = keccak256(abi.encodePacked("IND:KEEPALIVE", address(this), owner, y, avgSigned));
+        address rec = ECDSA.recover(ECDSA.toEthSignedMessageHash(h), v, r, s_);
+
+        // accept signature by signingKey OR by owner itself (if uninitialized)
+        address sk = registry.signingKeyOf(owner);
+        if (sk != address(0)) {
+            require(rec == sk, "bad-keepalive-sig");
+        } else {
+            require(rec == owner, "bad-keepalive-sig");
+        }
+
+        _avgSigned[owner][y] = avgSigned;
+        _lastAliveTs[owner] = block.timestamp;
+        // update avg timer baseline too
+        if (_avgLastTs[owner] == 0) {
+            _avgYear[owner] = y;
+        }
+        _avgLastTs[owner] = block.timestamp;
+
+        emit KeptAlive(owner, y, avgSigned);
+    }
+
+    function defaultHeirOf(address owner) external view returns (address) {
+        return _defaultHeir[owner];
+    }
+
     function transfer(address to, uint256 amount) public override returns (bool) {
         require(!registry.isInitialized(msg.sender), "owner-disabled");
         _touchSpend(msg.sender);
+        _touchAlive(msg.sender);
         _transferWithInheritance(msg.sender, to, amount, MIN_WAIT_SECONDS, bytes32(0));
         return true;
     }
@@ -411,6 +530,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         external
         returns (bool)
     {
+        _touchAlive(msg.sender);
         _transferWithInheritance(msg.sender, to, amount, waitSeconds, characteristic);
         return true;
     }
@@ -421,6 +541,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         unchecked {
             _approve(from, msg.sender, allowanceCur - amount);
         }
+        _touchAlive(from);
 
         _transferWithInheritance(from, to, amount, MIN_WAIT_SECONDS, bytes32(0));
         return true;
