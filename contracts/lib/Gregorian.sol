@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 /// @notice Minimal Gregorian helper for UTC year extraction.
 /// @dev Algorithm based on civil-from-days (proleptic Gregorian calendar).
 library Gregorian {
+    
     // IND compatibility: extension method used by token (uint256(ts).yearOf()).
     function yearOf(uint256 ts) internal pure returns (uint16) {
         return uint16(yearFromTimestamp(ts));
     }
-
-    /// @notice Returns the Gregorian year for a given unix timestamp (UTC).
+/// @notice Returns the Gregorian year for a given unix timestamp (UTC).
     function yearFromTimestamp(uint256 ts) internal pure returns (uint16) {
         // Convert unix timestamp to days since 1970-01-01, then to "civil date".
         // 1970-01-01 corresponds to day 719468 in the civil-from-days algorithm.

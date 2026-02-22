@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./lib/Gregorian.sol";
-import "./lib/IndBuckets1h.sol";
 
 /*
 Inheritance Dollar (IND)
@@ -50,6 +49,7 @@ contract INDKeyRegistry is AccessControl {
     event RevokeNonceUsed(address indexed owner, uint256 nonce);
 
     constructor(address admin) {
+
         require(admin != address(0), "admin=0");
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(REGISTRY_ADMIN_ROLE, admin);
@@ -218,9 +218,6 @@ contract INDKeyRegistry is AccessControl {
 /// Inheritance Dollar Token
 /// ------------------------------------------------------------------------
 contract InheritanceDollar is ERC20Permit, AccessControl {
-    using IndBuckets1h for IndBuckets1h.State;
-    IndBuckets1h.State private _buckets1h;
-
     using ECDSA for bytes32;
     using Gregorian for uint256;
 
@@ -317,6 +314,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         ERC20("Inheritance Dollar", "IND")
         ERC20Permit("Inheritance Dollar")
     {
+
         require(admin != address(0), "admin=0");
         require(address(keyRegistry) != address(0), "registry=0");
 
@@ -330,7 +328,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Owner-receive safety: if someone sends/mints to an initialized owner address,
     // redirect to its signingKey so funds are never trapped on owner-disabled address.
     // --------------------------------------------------------------------
-    function _resolveRecipient(address to) internal view returns (address) {
+                        function _resolveRecipient(address to) internal view returns (address) {
         if (to == address(0)) return to;
 
         // If logical owner initialized → redirect to signingKey
@@ -346,6 +344,11 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // Otherwise allow raw addresses (uninitialized owner or external address)
         return to;
     }
+
+
+
+
+
 
     // --------------------------------------------------------------------
     // Views
@@ -384,16 +387,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         }
         return sum;
     }
-
-
-    function bucketsSpendableBalanceOf(address account) public view returns (uint256) {
-        return _buckets1h.sumSpendable(account, uint64(block.timestamp));
-    }
-
-    function bucketsLockedBalanceOf(address account) public view returns (uint256) {
-        return _buckets1h.sumLocked(account, uint64(block.timestamp));
-    }
-
 
     function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
         public
@@ -442,6 +435,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         // enrollment: initialize annual bucket for inactivity tracking
         _avgAccumulate(msg.sender);
+        // enrollment: start inactivity timer at activation
+        // enrollment: start inactivity timer at activation
         // Enrollment: starting liveness timer at activation (so inactivity can be detected even if never spent)
         uint256 bal = balanceOf(msg.sender);
         if (bal > 0) {
@@ -455,18 +450,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
             _head[msg.sender] = oldLots.length;
 
             // make migrated funds immediately spendable under signingKey
-            // bucket mirror
-            {
-                uint64 nowTs = uint64(block.timestamp);
-                _buckets1h.addIncoming(
-                    signingKey,
-                    uint128(bal),
-                    nowTs,
-                    nowTs,
-                    address(0),
-                    bytes32(0)
-                );
-            }
             _lots[signingKey].push(
                 Lot({
                     senderOwner: address(0),
@@ -869,9 +852,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 waitSeconds,
         bytes32 characteristic
     ) internal {
-        // spendable accounting (must happen for every spend path)
-        _consumeSpendableLots(sender, amount);
-
         recipient = _resolveRecipient(recipient);
 
         // Resolve logical owner (if sender is signingKey)
@@ -885,26 +865,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 nowTs = uint64(block.timestamp);
         uint64 minUnlock = nowTs + MIN_WAIT_SECONDS;
         uint64 unlockAt = nowTs + waitSeconds;
-
-        // bucket primary: track incoming as locked/spendable
-        _buckets1h.addIncoming(
-            recipient,
-            uint128(amount),
-            minUnlock,
-            unlockAt,
-            ownerLogical,
-            characteristic
-        );
-
-        // bucket mirror
-        _buckets1h.addIncoming(
-            recipient,
-            uint128(amount),
-            minUnlock,
-            unlockAt,
-            ownerLogical,
-            characteristic
-        );
 
         _lots[recipient].push(
             Lot({
@@ -926,10 +886,44 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function _consumeSpendableLots(address owner, uint256 amount) internal {
-        _buckets1h.consumeSpendable(owner, amount, uint64(block.timestamp));
+        Lot[] storage arr = _lots[owner];
+        uint256 remaining = amount;
+        uint64 nowTs = uint64(block.timestamp);
+
+        uint256 i = _head[owner];
+        // consume only spendable lots, starting from head
+        for (; i < arr.length && remaining > 0; i++) {
+            Lot storage lot = arr[i];
+
+            // skip empty lots; they can be compacted by advancing head later
+            if (lot.amount == 0) continue;
+
+            // not yet unlocked => cannot spend from here or later unlocked ones,
+            // but we must continue scanning because later lots might already be unlocked
+            // (unlockTime is not guaranteed monotonic).
+            if (lot.unlockTime > nowTs) continue;
+
+            uint256 lotAmt = uint256(lot.amount);
+            if (lotAmt <= remaining) {
+                remaining -= lotAmt;
+                lot.amount = 0;
+            } else {
+                // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
+                // forge-lint: disable-next-line(unsafe-typecast)
+                lot.amount = uint128(lotAmt - remaining);
+                remaining = 0;
+            }
+        }
+
+        require(remaining == 0, "insufficient-spendable");
+
+        // advance head over leading empty lots to prevent unbounded growth costs
+        uint256 h = _head[owner];
+        while (h < arr.length && arr[h].amount == 0) {
+            h++;
+        }
+        _head[owner] = h;
     }
-
-
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         to = _resolveRecipient(to);
@@ -950,18 +944,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         );
 
         _mint(to, amount);
-
-        
-        _touchSpend(to);
-// bucket mirror
-        _buckets1h.addIncoming(
-            to,
-            uint128(amount),
-            nowTs,
-            nowTs,
-            address(0),
-            bytes32(0)
-        );
     }
 
     // --------------------------------------------------------------------
