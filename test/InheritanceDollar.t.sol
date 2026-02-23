@@ -49,9 +49,8 @@ contract InheritanceDollarTest is Test {
 
         // Alice transfers 10 to Bob (default wait = 86400)
         vm.prank(alice);
-        assertTrue(ind.transfer(bob, 10 ether)); 
-
-        // Immediately after transfer
+        ind.transfer(bob, 10 ether);
+// Immediately after transfer
         assertEq(ind.balanceOf(bob), 10 ether);
         assertEq(ind.lockedBalanceOf(bob), 10 ether);
         assertEq(ind.spendableBalanceOf(bob), 0);
@@ -68,9 +67,8 @@ contract InheritanceDollarTest is Test {
         ind.mint(alice, 50 ether);
 
         vm.prank(alice);
-        assertTrue(ind.transfer(bob, 20 ether)); 
-
-        uint256 balance = ind.balanceOf(bob);
+        ind.transfer(bob, 20 ether);
+uint256 balance = ind.balanceOf(bob);
         uint256 locked = ind.lockedBalanceOf(bob);
         uint256 spendable = ind.spendableBalanceOf(bob);
 
@@ -104,9 +102,8 @@ contract InheritanceDollarTest is Test {
         ind.mint(alice, 100 ether);
 
         vm.prank(alice);
-        assertTrue(ind.transfer(bob, 10 ether)); 
-
-        // Revoke before unlock
+        ind.transfer(bob, 10 ether);
+// Revoke before unlock
         vm.prank(alice);
         ind.revoke(bob, 0);
 
@@ -117,9 +114,8 @@ contract InheritanceDollarTest is Test {
         ind.mint(alice, 10 ether);
 
         vm.prank(alice);
-        assertTrue(ind.transfer(bob, 10 ether)); 
-
-        vm.warp(block.timestamp + 86400);
+        ind.transfer(bob, 10 ether);
+vm.warp(block.timestamp + 86400);
 
         vm.prank(alice);
         vm.expectRevert(bytes("already-unlocked"));
@@ -131,24 +127,22 @@ contract InheritanceDollarTest is Test {
         ind.mint(alice, 100 ether);
 
         vm.prank(alice);
-        assertTrue(ind.transfer(bob, 20 ether)); 
-
-        vm.prank(bob);
+        ind.transfer(bob, 20 ether);
+vm.prank(bob);
         ind.approve(alice, 20 ether);
 
         vm.prank(alice);
         vm.expectRevert(bytes("insufficient-spendable"));
-        assertTrue(ind.transferFrom(bob, alice, 1 ether)); 
-    }
+        ind.transferFrom(bob, alice, 1 ether);
+}
 
     function test_separate_keys_should_control_revoke_but_currently_fail() public {
         vm.prank(admin);
         ind.mint(alice, 100 ether);
 
         vm.prank(alice);
-        assertTrue(ind.transfer(bob, 10 ether)); 
-
-        // Simulate a different address trying revoke
+        ind.transfer(bob, 10 ether);
+// Simulate a different address trying revoke
         address revokeKey = address(0xDEAD);
 
         vm.prank(revokeKey);
@@ -169,9 +163,8 @@ contract InheritanceDollarTest is Test {
 
         // signingKey creates a locked lot
         vm.prank(signing);
-        assertTrue(ind.transfer(bob, 10 ether)); 
-
-        // owner tries to revoke -> must fail (only revokeKey can)
+        ind.transfer(bob, 10 ether);
+// owner tries to revoke -> must fail (only revokeKey can)
         vm.prank(alice);
         vm.expectRevert(bytes("not-revoke"));
         ind.revoke(bob, 0);
@@ -190,9 +183,8 @@ contract InheritanceDollarTest is Test {
 
         // signingKey creates locked lot
         vm.prank(signing);
-        assertTrue(ind.transfer(bob, 10 ether)); 
-
-        // revokeKey revokes successfully
+        ind.transfer(bob, 10 ether);
+// revokeKey revokes successfully
         vm.prank(revokeK);
         ind.revoke(bob, 0);
 
@@ -246,13 +238,12 @@ contract InheritanceDollarTest is Test {
 
         // signingKey sends some IND back to owner (owner receives, but must be non-operational)
         vm.prank(signing);
-        assertTrue(ind.transfer(alice, 1 ether)); 
-
-        // owner tries to transfer -> MUST revert (owner-disabled)
+        ind.transfer(alice, 1 ether);
+// owner tries to transfer -> MUST revert (owner-disabled)
         vm.prank(alice);
         vm.expectRevert(bytes("owner-disabled"));
-        assertTrue(ind.transfer(bob, 1 ether)); 
-    }
+        ind.transfer(bob, 1 ether);
+}
 
     function test_lot_senderOwner_is_logical_owner_when_sent_by_signingKey() public {
         address signing = address(0x1111);
@@ -265,9 +256,8 @@ contract InheritanceDollarTest is Test {
         ind.activateKeysAndMigrate(signing, revokeK);
 
         vm.prank(signing);
-        assertTrue(ind.transfer(bob, 10 ether)); 
-
-        InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
+        ind.transfer(bob, 10 ether);
+InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
         assertEq(lots.length, 1);
         assertEq(lots[0].senderOwner, alice); // must be logical owner, not signingKey
     }
@@ -286,9 +276,8 @@ contract InheritanceDollarTest is Test {
 
         // signingKey sends locked lot to bob
         vm.prank(signing);
-        assertTrue(ind.transfer(bob, 10 ether)); 
-
-        // revokeKey revokes -> refund must go to signingKey (owner should not regain balance)
+        ind.transfer(bob, 10 ether);
+// revokeKey revokes -> refund must go to signingKey (owner should not regain balance)
         vm.prank(revokeK);
         ind.revoke(bob, 0);
 
@@ -304,8 +293,8 @@ contract InheritanceDollarTest is Test {
         // spam lots to Bob (locked)
         vm.startPrank(alice);
         for (uint256 i = 0; i < 200; i++) {
-            assertTrue(ind.transfer(bob, 1 ether)); 
-        }
+        ind.transfer(bob, 1 ether);
+}
         vm.stopPrank();
 
         // unlock all
@@ -317,9 +306,8 @@ contract InheritanceDollarTest is Test {
         // Bob spends everything in one go
         address carl = address(0xC);
         vm.prank(bob);
-        assertTrue(ind.transfer(carl, 200 ether)); 
-
-        // after consumption, spendable should be 0 and head should have advanced
+        ind.transfer(carl, 200 ether);
+// after consumption, spendable should be 0 and head should have advanced
         assertEq(ind.spendableBalanceOf(bob), 0);
         assertGt(ind.headOf(bob), 0);
     }

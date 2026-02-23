@@ -223,6 +223,11 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     uint64 public constant MIN_WAIT_SECONDS = 86400; // 24 hours
+
+    uint64 public constant DEAD_AFTER_SECONDS = uint64(7 * 365 days);
+
+    // F03: account considered dead if no *signed outgoing* activity for this period
+
     // Anti-abuse: cap maximum inheritance wait (upper bound; includes leap years)
     uint64 public constant MAX_WAIT_SECONDS = uint64(50 * 366 days);
 
@@ -276,6 +281,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
     mapping(address => Lot[]) private _lots;
     mapping(address => uint256) private _head;
+
+    // F03: last time an owner signingKey performed a signed outgoing action
+    mapping(address => uint64) private _lastSignedOutTs;
 
     // -------- EIP-712 typehashes --------
     bytes32 private constant TRANSFER_TYPEHASH = keccak256(
@@ -345,11 +353,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return to;
     }
 
-
-
-
-
-
     // --------------------------------------------------------------------
     // Views
     // --------------------------------------------------------------------
@@ -401,9 +404,13 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // --------------------------------------------------------------------
 
     function transfer(address to, uint256 amount) public override returns (bool) {
+        address owner = _logicalOwnerOf(msg.sender);
+        if (registry.ownerOfSigningKey(msg.sender) != address(0)) _touchSignedOut(owner);
+
         require(!registry.isInitialized(msg.sender), "owner-disabled");
         _touchSpend(msg.sender);
         _transferWithInheritance(msg.sender, to, amount, MIN_WAIT_SECONDS, bytes32(0));
+
         return true;
     }
 
@@ -411,11 +418,13 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         external
         returns (bool)
     {
+        require(!registry.isInitialized(msg.sender), "owner-disabled");
         _transferWithInheritance(msg.sender, to, amount, waitSeconds, characteristic);
         return true;
     }
 
     function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+    require(!registry.isInitialized(from), "owner-disabled");
         uint256 allowanceCur = allowance(from, msg.sender);
         require(allowanceCur >= amount, "insufficient allowance");
         unchecked {
@@ -423,6 +432,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         }
 
         _transferWithInheritance(from, to, amount, MIN_WAIT_SECONDS, bytes32(0));
+
         return true;
     }
 
@@ -728,7 +738,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         require(waitSeconds >= MIN_WAIT_SECONDS, "wait-too-short");
 
         require(waitSeconds <= MAX_WAIT_SECONDS, "wait-too-long");
-        require(waitSeconds <= MAX_WAIT_SECONDS, "wait-too-long");
         uint256 nonce = registry.signingNonceOf(from);
 
         bytes32 structHash =
@@ -740,7 +749,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         require(signer == from, "bad-signature");
 
         registry.useSigningNonce(from, nonce);
-        _touchSpend(from);
+        _touchSignedOut(_logicalOwnerOf(from));
         _transferWithInheritance(from, to, amount, waitSeconds, characteristic);
     }
 
@@ -752,14 +761,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         address o = registry.ownerOfSigningKey(a);
         if (o != address(0)) return o;
         return a;
-    }
-
-    function _isDead(address owner) internal view returns (bool) {
-        uint16 lastY = _lastSpendYear[owner];
-        if (lastY == 0) return false; // not enrolled / never spent => treat as alive until first spend sets it
-        uint16 nowY = uint256(block.timestamp).yearOf();
-        // dead if nowY >= lastY + INACTIVITY_YEARS
-        return nowY >= uint16(lastY + INACTIVITY_YEARS);
     }
 
     function _touchSpend(address actor) internal {
@@ -845,6 +846,20 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         avg = acc / elapsed;
     }
 
+    // --------------------------------------------------------------------
+    // F03: Dead detection helpers
+    // --------------------------------------------------------------------
+
+    function _touchSignedOut(address ownerLogical) internal {
+        _lastSignedOutTs[ownerLogical] = uint64(block.timestamp);
+    }
+
+    function _isDead(address ownerLogical) internal view returns (bool) {
+        uint64 last = _lastSignedOutTs[ownerLogical];
+        if (last == 0) return false;
+        return uint64(block.timestamp) > last + DEAD_AFTER_SECONDS;
+    }
+
     function _transferWithInheritance(
         address sender,
         address recipient,
@@ -864,6 +879,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 minUnlock = nowTs + MIN_WAIT_SECONDS;
+
         uint64 unlockAt = nowTs + waitSeconds;
 
         _lots[recipient].push(
