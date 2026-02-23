@@ -22,7 +22,7 @@ library Gregorian {
         uint256 y = yoe + era * 400;
 
         // forge-lint: disable-next-line(unsafe-typecast)
-        return uint16(y);
+        return uint16(y + 1);
     }
 
     /// @notice Returns true if `year` is a leap year in the proleptic Gregorian calendar.
