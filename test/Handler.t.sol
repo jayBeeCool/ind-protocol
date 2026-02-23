@@ -71,7 +71,7 @@ contract INDHandler is Test {
         ind.activateKeysAndMigrate(signingKeys[i], revokeKeys[i]);
     }
 
-    function act_transfer(uint256 fromSeed, uint256 toSeed, uint256 amtSeed) external {
+    function actTransfer(uint256 fromSeed, uint256 toSeed, uint256 amtSeed) external {
         uint256 i = _boundIdx(fromSeed, owners.length);
         uint256 j = _boundIdx(toSeed, owners.length);
 
@@ -85,10 +85,10 @@ contract INDHandler is Test {
         uint256 amt = bound(amtSeed, 1, spendable);
 
         vm.prank(from);
-        ind.transfer(to, amt);
+        assertTrue(ind.transfer(to, amt)); 
     }
 
-    function act_transferWithInheritance(uint256 fromSeed, uint256 toSeed, uint256 amtSeed, uint256 waitSeed) external {
+    function actTransferWithInheritance(uint256 fromSeed, uint256 toSeed, uint256 amtSeed, uint256 waitSeed) external {
         uint256 i = _boundIdx(fromSeed, owners.length);
         uint256 j = _boundIdx(toSeed, owners.length);
 
@@ -106,7 +106,7 @@ contract INDHandler is Test {
         ind.transferWithInheritance(to, amt, wait, bytes32(0));
     }
 
-    function act_reduce(uint256 ownerSeed, uint256 recipientSeed, uint256 lotSeed, uint256 newUnlockSeed) external {
+    function actReduce(uint256 ownerSeed, uint256 recipientSeed, uint256 lotSeed, uint256 newUnlockSeed) external {
         uint256 oi = _boundIdx(ownerSeed, owners.length);
         uint256 ri = _boundIdx(recipientSeed, owners.length);
 
@@ -143,7 +143,7 @@ contract INDHandler is Test {
         ind.reduceUnlockTime(recipient, lotIndex, newU);
     }
 
-    function act_revoke(uint256 ownerSeed, uint256 recipientSeed, uint256 lotSeed) external {
+    function actRevoke(uint256 ownerSeed, uint256 recipientSeed, uint256 lotSeed) external {
         uint256 ri = _boundIdx(recipientSeed, owners.length);
         address recipient = owners[ri];
 

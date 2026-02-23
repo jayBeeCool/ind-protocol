@@ -45,7 +45,7 @@ contract F2_Advanced_Test is Test {
 
         vm.prank(signing);
         // raw addresses are allowed (ERC20-compatible); no revert expected
-        ind.transfer(raw, 1 ether);
+        assertTrue(ind.transfer(raw, 1 ether)); 
     }
 
     function test_send_to_initialized_owner_redirects_to_signing() public {
@@ -53,7 +53,7 @@ contract F2_Advanced_Test is Test {
         ind.mint(signing, 2 ether);
 
         vm.prank(signing);
-        ind.transfer(owner, 1 ether); // should redirect to signing (self), no owner balance
+        assertTrue(ind.transfer(owner, 1 ether)); // should redirect to signing (self), no owner balance
 
         assertEq(ind.balanceOf(owner), 0);
     }
