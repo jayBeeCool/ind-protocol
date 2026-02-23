@@ -735,6 +735,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         bytes calldata signature
     ) external {
         require(!registry.isInitialized(from), "owner-disabled");
+        require(!registry.isInitialized(from), "owner-disabled");
         require(block.timestamp <= deadline, "expired");
         require(waitSeconds >= MIN_WAIT_SECONDS, "wait-too-short");
 
