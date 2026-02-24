@@ -139,6 +139,16 @@ contract INDKeyRegistry is AccessControl {
 }
 
 contract InheritanceDollar is ERC20Permit, AccessControl {
+    /* Legacy compatibility type: Lot (type-only; storage is in step4 mappings) */
+    struct Lot {
+        address senderOwner;
+        uint128 amount;
+        uint64 createdAt;
+        uint64 minUnlockTime;
+        uint64 unlockTime;
+        bytes32 characteristic;
+    }
+
     using ECDSA for bytes32;
     using Gregorian for uint256;
 
