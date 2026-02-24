@@ -365,27 +365,33 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return _head[account];
     }
 
-    function spendableBalanceOf(address account) public view returns (uint256) {
+        function spendableBalanceOf(address account) public view returns (uint256) {
         Lot[] storage arr = _lots[account];
         uint256 sum;
         uint64 nowTs = uint64(block.timestamp);
+        uint256 h = _head[account];
+        uint256 len = arr.length;
 
-        for (uint256 i = _head[account]; i < arr.length; i++) {
-            if (arr[i].amount != 0 && arr[i].unlockTime <= nowTs) {
-                sum += uint256(arr[i].amount);
+        for (uint256 i = h; i < len; ++i) {
+            Lot storage lot = arr[i];
+            if (lot.amount != 0 && lot.unlockTime <= nowTs) {
+                sum += lot.amount;
             }
         }
         return sum;
     }
 
-    function lockedBalanceOf(address account) public view returns (uint256) {
+        function lockedBalanceOf(address account) public view returns (uint256) {
         Lot[] storage arr = _lots[account];
         uint256 sum;
         uint64 nowTs = uint64(block.timestamp);
+        uint256 h = _head[account];
+        uint256 len = arr.length;
 
-        for (uint256 i = _head[account]; i < arr.length; i++) {
-            if (arr[i].amount != 0 && arr[i].unlockTime > nowTs) {
-                sum += uint256(arr[i].amount);
+        for (uint256 i = h; i < len; ++i) {
+            Lot storage lot = arr[i];
+            if (lot.amount != 0 && lot.unlockTime > nowTs) {
+                sum += lot.amount;
             }
         }
         return sum;
@@ -903,45 +909,79 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         emit TransferWithInheritance(sender, recipient, amount, unlockAt, minUnlock, characteristic, lotIndex);
     }
 
-    function _consumeSpendableLots(address owner, uint256 amount) internal {
+        function _consumeSpendableLots(address owner, uint256 amount) internal {
         Lot[] storage arr = _lots[owner];
         uint256 remaining = amount;
         uint64 nowTs = uint64(block.timestamp);
 
-        uint256 i = _head[owner];
-        // consume only spendable lots, starting from head
-        for (; i < arr.length && remaining > 0; i++) {
+        uint256 h = _head[owner];
+        uint256 len = arr.length;
+        uint256 i = h;
+
+        for (; i < len && remaining != 0; ++i) {
             Lot storage lot = arr[i];
-
-            // skip empty lots; they can be compacted by advancing head later
-            if (lot.amount == 0) continue;
-
-            // not yet unlocked => cannot spend from here or later unlocked ones,
-            // but we must continue scanning because later lots might already be unlocked
-            // (unlockTime is not guaranteed monotonic).
+            uint128 amt = lot.amount;
+            if (amt == 0) continue;
             if (lot.unlockTime > nowTs) continue;
 
-            uint256 lotAmt = uint256(lot.amount);
-            if (lotAmt <= remaining) {
-                remaining -= lotAmt;
+            if (amt <= remaining) {
+                remaining -= amt;
                 lot.amount = 0;
             } else {
-                // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
-                // forge-lint: disable-next-line(unsafe-typecast)
-                lot.amount = uint128(lotAmt - remaining);
+                lot.amount = uint128(uint256(amt) - remaining);
                 remaining = 0;
             }
         }
 
+        
+        // F02A GC trigger: compact only when head moved far enough to matter.
+        // - avoid doing it for small arrays
+        // - do it when head > 64 and head is past half of the array
+        {
+            uint256 hGC = _head[owner];
+            uint256 lenGC = arr.length;
+            if (hGC > 64 && (hGC * 2) > lenGC) {
+                _compactLots(owner);
+            }
+        }
+
+
+
         require(remaining == 0, "insufficient-spendable");
 
-        // advance head over leading empty lots to prevent unbounded growth costs
-        uint256 h = _head[owner];
-        while (h < arr.length && arr[h].amount == 0) {
-            h++;
+        while (h < len && arr[h].amount == 0) {
+            ++h;
         }
         _head[owner] = h;
     }
+
+    // --------------------------------------------------------------------
+    // F02A: automatic lot compaction (GC) to cap long-term scan costs.
+    // Triggered only when head has moved far into the array.
+    // --------------------------------------------------------------------
+    function _compactLots(address owner) internal {
+        Lot[] storage arr = _lots[owner];
+        uint256 h = _head[owner];
+        uint256 len = arr.length;
+        if (h == 0 || h >= len) {
+            _head[owner] = (h >= len) ? len : h;
+            return;
+        }
+
+        // Move live tail to the front: arr[i] = arr[i + h]
+        uint256 newLen = len - h;
+        for (uint256 i = 0; i < newLen; ++i) {
+            arr[i] = arr[i + h];
+        }
+
+        // Pop extra slots
+        for (uint256 i = len; i > newLen; --i) {
+            arr.pop();
+        }
+
+        _head[owner] = 0;
+    }
+
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         to = _resolveRecipient(to);
