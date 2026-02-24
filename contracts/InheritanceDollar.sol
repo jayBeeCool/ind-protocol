@@ -141,13 +141,6 @@ contract INDKeyRegistry is AccessControl {
 contract InheritanceDollar is ERC20Permit, AccessControl {
     /* Legacy compatibility type: Lot (type-only; storage is in step4 mappings) */
     struct Lot {
-
-    // ---- Legacy compatibility view ----
-    function lastSpendYearOf(address) external pure returns (uint16) {
-        // Step B: real implementation later
-        return 0;
-    }
-
         address senderOwner;
         uint128 amount;
         uint64 createdAt;

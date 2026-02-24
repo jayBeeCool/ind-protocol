@@ -18,6 +18,21 @@ contract InheritanceDollarCompat is InheritanceDollar {
 
     function activateKeysAndMigrate(address, address) external pure {
         revert("B:activateKeysAndMigrate");
+
+    // ---- Legacy API compatibility ----
+    function transferWithInheritanceBySig(
+        address signing,
+        address recipient,
+        uint256 amount,
+        uint64 waitSeconds,
+        bytes32 characteristic,
+        uint256 deadline,
+        bytes calldata signature
+    ) external pure returns (bool) {
+        signing; recipient; amount; waitSeconds; characteristic; deadline; signature;
+        revert("compat: transferWithInheritanceBySig");
+    }
+
     }
 
     function transferWithInheritance_legacy(
