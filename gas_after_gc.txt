@@ -1,0 +1,404 @@
+No files changed, compilation skipped
+
+Ran 3 tests for test/F01_GregorianVectors.t.sol:F01_GregorianVectors_Test
+[PASS] test_leap_year_rules() (gas: 4626)
+[PASS] test_yearOf_epoch() (gas: 4294)
+[PASS] test_yearStartTs_monotonic() (gas: 5712)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 301.18µs (235.00µs CPU time)
+
+Ran 3 tests for test/F3_PropertySweep.t.sol:F3_PropertySweep_Test
+[PASS] test_property_burn_happens_only_when_fully_dead() (gas: 1316039)
+[PASS] test_property_burn_implies_recipient_dead() (gas: 419327)
+[PASS] test_property_no_unintended_burn() (gas: 416385)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 2.70ms (1.68ms CPU time)
+
+Ran 3 tests for test/F2_Advanced.t.sol:F2_Advanced_Test
+[PASS] test_receive_does_not_keep_alive() (gas: 125697)
+[PASS] test_send_to_initialized_owner_redirects_to_signing() (gas: 278848)
+[PASS] test_send_to_uninitialized_owner_reverts() (gas: 317131)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 3.13ms (707.59µs CPU time)
+
+Ran 2 tests for test/F2_RedirectOwnerReceive.t.sol:F2_RedirectOwnerReceive_Test
+[PASS] test_bySig_to_owner_redirects_to_signing() (gas: 242925)
+[PASS] test_transfer_to_owner_redirects_to_signing() (gas: 326400)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 5.79ms (1.79ms CPU time)
+
+Ran 19 tests for test/F3_DeadDefaultHeir.t.sol:F3_DeadDefaultHeir_Test
+[PASS] test_F3_bothDead_goesToDefaultHeir() (gas: 1421310)
+[PASS] test_F3_bothDead_noHeir_burns() (gas: 1318150)
+[PASS] test_activate_migrates_balance_to_signingKey() (gas: 549498)
+[PASS] test_head_advances_after_consumption() (gas: 31679453)
+[PASS] test_invariant_balance_equals_locked_plus_spendable() (gas: 387550)
+[PASS] test_lot_senderOwner_is_logical_owner_when_sent_by_signingKey() (gas: 705923)
+[PASS] test_mint_exceeds_cap_reverts() (gas: 200371)
+[PASS] test_mint_isImmediatelySpendable() (gas: 208651)
+[PASS] test_mint_transfer_lock_and_unlock() (gas: 432940)
+[PASS] test_owner_cannot_revoke_after_setup() (gas: 730617)
+[PASS] test_owner_disabled_even_if_receives_tokens_after_activation() (gas: 673738)
+[PASS] test_reduceUnlockTime_valid_and_invalid() (gas: 463656)
+[PASS] test_revokeKey_can_revoke() (gas: 803664)
+[PASS] test_revokeKey_can_rotate_signingKey() (gas: 272042)
+[PASS] test_revoke_before_and_after_unlock() (gas: 782296)
+[PASS] test_revoke_refunds_to_signingKey_not_owner() (gas: 836852)
+[PASS] test_separate_keys_should_control_revoke_but_currently_fail() (gas: 381868)
+[PASS] test_transferFrom_cannot_bypass_lock() (gas: 456944)
+[PASS] test_waitTooShort_reverts() (gas: 50327)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 25.96ms (26.45ms CPU time)
+
+Ran 21 tests for test/F4E_ConsumeEdge.t.sol:F4E_ConsumeEdge
+[PASS] test_activate_migrates_balance_to_signingKey() (gas: 549520)
+[PASS] test_doubleSweep_revertsEmpty() (gas: 871796)
+[PASS] test_headDoesNotSkipPartialLot() (gas: 510149)
+[PASS] test_head_advances_after_consumption() (gas: 31679497)
+[PASS] test_invariant_balance_equals_locked_plus_spendable() (gas: 387550)
+[PASS] test_lockedCannotBeConsumedEarly() (gas: 396622)
+[PASS] test_lot_senderOwner_is_logical_owner_when_sent_by_signingKey() (gas: 705900)
+[PASS] test_mint_exceeds_cap_reverts() (gas: 200371)
+[PASS] test_mint_isImmediatelySpendable() (gas: 208608)
+[PASS] test_mint_transfer_lock_and_unlock() (gas: 432940)
+[PASS] test_mixedLockedUnlockedConsumption() (gas: 676211)
+[PASS] test_owner_cannot_revoke_after_setup() (gas: 730639)
+[PASS] test_owner_disabled_even_if_receives_tokens_after_activation() (gas: 673693)
+[PASS] test_reduceUnlockTime_valid_and_invalid() (gas: 463611)
+[PASS] test_revokeKey_can_revoke() (gas: 803664)
+[PASS] test_revokeKey_can_rotate_signingKey() (gas: 272108)
+[PASS] test_revoke_before_and_after_unlock() (gas: 782340)
+[PASS] test_revoke_refunds_to_signingKey_not_owner() (gas: 836786)
+[PASS] test_separate_keys_should_control_revoke_but_currently_fail() (gas: 381825)
+[PASS] test_transferFrom_cannot_bypass_lock() (gas: 456921)
+[PASS] test_waitTooShort_reverts() (gas: 50393)
+Suite result: ok. 21 passed; 0 failed; 0 skipped; finished in 29.48ms (34.56ms CPU time)
+
+Ran 18 tests for test/F3_BySigOwnerDisabled.t.sol:F3_BySigOwnerDisabled_Test
+[PASS] test_activate_migrates_balance_to_signingKey() (gas: 549498)
+[PASS] test_bySig_ownerDisabled_reverts() (gas: 222798)
+[PASS] test_head_advances_after_consumption() (gas: 31679497)
+[PASS] test_invariant_balance_equals_locked_plus_spendable() (gas: 387505)
+[PASS] test_lot_senderOwner_is_logical_owner_when_sent_by_signingKey() (gas: 705878)
+[PASS] test_mint_exceeds_cap_reverts() (gas: 200393)
+[PASS] test_mint_isImmediatelySpendable() (gas: 208608)
+[PASS] test_mint_transfer_lock_and_unlock() (gas: 432895)
+[PASS] test_owner_cannot_revoke_after_setup() (gas: 730617)
+[PASS] test_owner_disabled_even_if_receives_tokens_after_activation() (gas: 673693)
+[PASS] test_reduceUnlockTime_valid_and_invalid() (gas: 463524)
+[PASS] test_revokeKey_can_revoke() (gas: 803708)
+[PASS] test_revokeKey_can_rotate_signingKey() (gas: 272086)
+[PASS] test_revoke_before_and_after_unlock() (gas: 782340)
+[PASS] test_revoke_refunds_to_signingKey_not_owner() (gas: 836808)
+[PASS] test_separate_keys_should_control_revoke_but_currently_fail() (gas: 381825)
+[PASS] test_transferFrom_cannot_bypass_lock() (gas: 456988)
+[PASS] test_waitTooShort_reverts() (gas: 50285)
+Suite result: ok. 18 passed; 0 failed; 0 skipped; finished in 33.03ms (36.05ms CPU time)
+
+Ran 17 tests for test/InheritanceDollar.t.sol:InheritanceDollarTest
+[PASS] test_activate_migrates_balance_to_signingKey() (gas: 549498)
+[PASS] test_head_advances_after_consumption() (gas: 31679475)
+[PASS] test_invariant_balance_equals_locked_plus_spendable() (gas: 387550)
+[PASS] test_lot_senderOwner_is_logical_owner_when_sent_by_signingKey() (gas: 705856)
+[PASS] test_mint_exceeds_cap_reverts() (gas: 200371)
+[PASS] test_mint_isImmediatelySpendable() (gas: 208673)
+[PASS] test_mint_transfer_lock_and_unlock() (gas: 432873)
+[PASS] test_owner_cannot_revoke_after_setup() (gas: 730617)
+[PASS] test_owner_disabled_even_if_receives_tokens_after_activation() (gas: 673693)
+[PASS] test_reduceUnlockTime_valid_and_invalid() (gas: 463591)
+[PASS] test_revokeKey_can_revoke() (gas: 803686)
+[PASS] test_revokeKey_can_rotate_signingKey() (gas: 272064)
+[PASS] test_revoke_before_and_after_unlock() (gas: 782340)
+[PASS] test_revoke_refunds_to_signingKey_not_owner() (gas: 836786)
+[PASS] test_separate_keys_should_control_revoke_but_currently_fail() (gas: 381803)
+[PASS] test_transferFrom_cannot_bypass_lock() (gas: 456988)
+[PASS] test_waitTooShort_reverts() (gas: 50285)
+Suite result: ok. 17 passed; 0 failed; 0 skipped; finished in 35.53ms (36.19ms CPU time)
+
+Ran 1 test for test/F4F_ConsumeFuzz.t.sol:F4F_ConsumeFuzz
+[PASS] testFuzz_consume_never_spends_locked(uint8,uint32,uint32,uint96,uint96) (runs: 256, μ: 3555303, ~: 2215087)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.49s (7.49s CPU time)
+
+Ran 3 tests for test/Invariant.t.sol:InvariantTest
+[PASS] invariant_balance_split_correct() (runs: 256, calls: 128000, reverts: 105702)
+
+╭-------------------+--------------------------------+-------+---------+----------╮
+| Contract          | Selector                       | Calls | Reverts | Discards |
++=================================================================================+
+| InheritanceDollar | activateKeysAndMigrate         | 7454  | 147     | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | activateKeysAndMigrateWithHeir | 7583  | 178     | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | approve                        | 7482  | 109     | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | grantRole                      | 7426  | 7424    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | mint                           | 7269  | 7269    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | permit                         | 7476  | 7476    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | reduceUnlockTime               | 7678  | 7678    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | renounceRole                   | 7643  | 7642    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revoke                         | 7693  | 7693    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeReplaceSigningAndMigrate | 7444  | 7444    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeRole                     | 7641  | 7641    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeSetDefaultHeir           | 7571  | 7571    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | sweepLot                       | 7446  | 7446    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transfer                       | 7586  | 7505    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferFrom                   | 7575  | 7498    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferWithInheritance        | 7504  | 7452    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferWithInheritanceBySig   | 7529  | 7529    | 0        |
+╰-------------------+--------------------------------+-------+---------+----------╯
+
+[PASS] invariant_head_monotonic() (runs: 256, calls: 128000, reverts: 105583)
+
+╭-------------------+--------------------------------+-------+---------+----------╮
+| Contract          | Selector                       | Calls | Reverts | Discards |
++=================================================================================+
+| InheritanceDollar | activateKeysAndMigrate         | 7534  | 151     | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | activateKeysAndMigrateWithHeir | 7401  | 145     | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | approve                        | 7650  | 108     | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | grantRole                      | 7445  | 7444    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | mint                           | 7481  | 7480    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | permit                         | 7579  | 7579    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | reduceUnlockTime               | 7560  | 7560    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | renounceRole                   | 7439  | 7438    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revoke                         | 7662  | 7662    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeReplaceSigningAndMigrate | 7630  | 7630    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeRole                     | 7592  | 7592    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeSetDefaultHeir           | 7517  | 7517    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | sweepLot                       | 7729  | 7729    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transfer                       | 7463  | 7376    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferFrom                   | 7526  | 7445    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferWithInheritance        | 7293  | 7228    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferWithInheritanceBySig   | 7499  | 7499    | 0        |
+╰-------------------+--------------------------------+-------+---------+----------╯
+
+[PASS] invariant_total_supply_nonzero() (runs: 256, calls: 128000, reverts: 105624)
+
+╭-------------------+--------------------------------+-------+---------+----------╮
+| Contract          | Selector                       | Calls | Reverts | Discards |
++=================================================================================+
+| InheritanceDollar | activateKeysAndMigrate         | 7451  | 147     | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | activateKeysAndMigrateWithHeir | 7548  | 146     | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | approve                        | 7530  | 92      | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | grantRole                      | 7386  | 7386    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | mint                           | 7501  | 7501    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | permit                         | 7503  | 7503    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | reduceUnlockTime               | 7586  | 7586    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | renounceRole                   | 7459  | 7455    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revoke                         | 7383  | 7383    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeReplaceSigningAndMigrate | 7561  | 7561    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeRole                     | 7587  | 7586    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | revokeSetDefaultHeir           | 7629  | 7629    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | sweepLot                       | 7652  | 7652    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transfer                       | 7433  | 7351    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferFrom                   | 7541  | 7463    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferWithInheritance        | 7507  | 7440    | 0        |
+|-------------------+--------------------------------+-------+---------+----------|
+| InheritanceDollar | transferWithInheritanceBySig   | 7743  | 7743    | 0        |
+╰-------------------+--------------------------------+-------+---------+----------╯
+
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 17.95s (29.80s CPU time)
+
+Ran 2 tests for test/InvariantHandler.t.sol:InvariantHandlerTest
+[PASS] invariant_balance_split_correct_for_all() (runs: 256, calls: 128000, reverts: 0)
+
+╭------------+----------------------------+-------+---------+----------╮
+| Contract   | Selector                   | Calls | Reverts | Discards |
++======================================================================+
+| INDHandler | actReduce                  | 21254 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | actRevoke                  | 21450 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | actTransfer                | 21310 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | actTransferWithInheritance | 21380 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | act_activate               | 21421 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | act_warp                   | 21185 | 0       | 0        |
+╰------------+----------------------------+-------+---------+----------╯
+
+[PASS] invariant_total_supply_bounded() (runs: 256, calls: 128000, reverts: 0)
+
+╭------------+----------------------------+-------+---------+----------╮
+| Contract   | Selector                   | Calls | Reverts | Discards |
++======================================================================+
+| INDHandler | actReduce                  | 21113 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | actRevoke                  | 21336 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | actTransfer                | 21456 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | actTransferWithInheritance | 21467 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | act_activate               | 21424 | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| INDHandler | act_warp                   | 21204 | 0       | 0        |
+╰------------+----------------------------+-------+---------+----------╯
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 150.70s (163.13s CPU time)
+
+╭---------------------------------------------------------+-----------------+--------+--------+--------+---------╮
+| contracts/InheritanceDollar.sol:INDKeyRegistry Contract |                 |        |        |        |         |
++================================================================================================================+
+| Deployment Cost                                         | Deployment Size |        |        |        |         |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| 1135837                                                 | 5182            |        |        |        |         |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+|                                                         |                 |        |        |        |         |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| Function Name                                           | Min             | Avg    | Median | Max    | # Calls |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| REGISTRY_ADMIN_ROLE                                     | 289             | 289    | 289    | 289    | 89      |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| grantRole                                               | 51494           | 51494  | 51494  | 51494  | 89      |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| hasRole                                                 | 2736            | 2736   | 2736   | 2736   | 150     |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| initKeysFromAdmin                                       | 142489          | 142983 | 142957 | 143173 | 44228   |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| isInitialized                                           | 651             | 2650   | 2651   | 2651   | 325275  |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| ownerOfSigningKey                                       | 610             | 1464   | 610    | 2610   | 222165  |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| revokeKeyOf                                             | 2753            | 4382   | 4862   | 4862   | 286     |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| rotateSigning                                           | 78789           | 78789  | 78789  | 78789  | 4       |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| signingKeyOf                                            | 711             | 3831   | 4820   | 4820   | 161417  |
+|---------------------------------------------------------+-----------------+--------+--------+--------+---------|
+| signingNonceOf                                          | 2607            | 2607   | 2607   | 2607   | 2       |
+╰---------------------------------------------------------+-----------------+--------+--------+--------+---------╯
+
+╭------------------------------------------------------------+-----------------+--------+--------+---------+---------╮
+| contracts/InheritanceDollar.sol:InheritanceDollar Contract |                 |        |        |         |         |
++====================================================================================================================+
+| Deployment Cost                                            | Deployment Size |        |        |         |         |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| 4431611                                                    | 21482           |        |        |         |         |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+|                                                            |                 |        |        |         |         |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| Function Name                                              | Min             | Avg    | Median | Max     | # Calls |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| DEAD_AFTER_SECONDS                                         | 349             | 349    | 349    | 349     | 4       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| DOMAIN_SEPARATOR                                           | 450             | 450    | 450    | 450     | 1       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| MAX_SUPPLY                                                 | 318             | 318    | 318    | 318     | 1       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| MINTER_ROLE                                                | 327             | 327    | 327    | 327     | 3       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| MIN_WAIT_SECONDS                                           | 259             | 259    | 259    | 259     | 82801   |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| activateKeysAndMigrate                                     | 174160          | 189706 | 176876 | 406206  | 24172   |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| activateKeysAndMigrateWithHeir                             | 176529          | 200769 | 200739 | 349466  | 22156   |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| approve                                                    | 10490           | 30166  | 30390  | 51806   | 22458   |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| balanceOf                                                  | 2577            | 2577   | 2577   | 2577    | 5429    |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| getLots                                                    | 11993           | 25102  | 21121  | 441692  | 85511   |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| grantRole                                                  | 29144           | 29400  | 29400  | 29656   | 6       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| headOf                                                     | 2574            | 2574   | 2574   | 2574    | 18      |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| lastSpendYearOf                                            | 510             | 510    | 510    | 510     | 2       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| lockedBalanceOf                                            | 4906            | 30842  | 14255  | 128927  | 5385    |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| mint                                                       | 35192           | 140483 | 151018 | 151246  | 109     |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| reduceUnlockTime                                           | 36808           | 42828  | 44600  | 44600   | 60      |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| renounceRole                                               | 2793            | 2793   | 2793   | 2793    | 6       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| revoke                                                     | 32385           | 109325 | 119529 | 132405  | 112     |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| revokeRole                                                 | 7418            | 7418   | 7418   | 7418    | 1       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| spendableBalanceOf                                         | 4886            | 33365  | 28791  | 191138  | 90802   |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| sweepLot                                                   | 26312           | 70127  | 61074  | 158198  | 7       |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| totalSupply                                                | 2426            | 2426   | 2426   | 2426    | 10      |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| transfer                                                   | 31701           | 158600 | 152530 | 1849761 | 42657   |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| transferFrom                                               | 54041           | 133963 | 135323 | 135323  | 241     |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| transferWithInheritance                                    | 37275           | 147932 | 141765 | 327877  | 43895   |
+|------------------------------------------------------------+-----------------+--------+--------+---------+---------|
+| transferWithInheritanceBySig                               | 28966           | 110464 | 110464 | 191963  | 2       |
+╰------------------------------------------------------------+-----------------+--------+--------+---------+---------╯
+
+╭----------------------------------------+-----------------+--------+--------+--------+---------╮
+| test/Handler.t.sol:INDHandler Contract |                 |        |        |        |         |
++===============================================================================================+
+| Deployment Cost                        | Deployment Size |        |        |        |         |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| 2542961                                | 10950           |        |        |        |         |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+|                                        |                 |        |        |        |         |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| Function Name                          | Min             | Avg    | Median | Max    | # Calls |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| actReduce                              | 21088           | 37782  | 33458  | 221214 | 42538   |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| actRevoke                              | 20784           | 37867  | 33154  | 252279 | 42958   |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| actTransfer                            | 17248           | 228660 | 227251 | 656884 | 42938   |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| actTransferWithInheritance             | 17253           | 231995 | 229974 | 510907 | 42991   |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| act_activate                           | 10070           | 28912  | 12570  | 435360 | 43019   |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| act_warp                               | 6620            | 7069   | 7304   | 7304   | 42556   |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| allOwners                              | 11861           | 11861  | 11861  | 11861  | 1       |
+|----------------------------------------+-----------------+--------+--------+--------+---------|
+| allSigningKeys                         | 11905           | 11905  | 11905  | 11905  | 1       |
+╰----------------------------------------+-----------------+--------+--------+--------+---------╯
+
+
+Ran 11 test suites in 152.73s (176.27s CPU time): 92 tests passed, 0 failed, 0 skipped (92 total tests)

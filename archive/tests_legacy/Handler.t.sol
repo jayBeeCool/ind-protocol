@@ -111,11 +111,11 @@ contract INDHandler is Test {
         uint256 ri = _boundIdx(recipientSeed, owners.length);
 
         address recipient = owners[ri];
-        InheritanceDollar.Lot[] memory lots = ind.getLots(recipient);
+        Lot[] memory lots = ind.getLots(recipient);
         if (lots.length == 0) return;
 
         uint256 lotIndex = _boundIdx(lotSeed, lots.length);
-        InheritanceDollar.Lot memory lot = lots[lotIndex];
+        Lot memory lot = lots[lotIndex];
         if (lot.amount == 0) return;
         if (block.timestamp >= lot.unlockTime) return;
 
@@ -147,11 +147,11 @@ contract INDHandler is Test {
         uint256 ri = _boundIdx(recipientSeed, owners.length);
         address recipient = owners[ri];
 
-        InheritanceDollar.Lot[] memory lots = ind.getLots(recipient);
+        Lot[] memory lots = ind.getLots(recipient);
         if (lots.length == 0) return;
 
         uint256 lotIndex = _boundIdx(lotSeed, lots.length);
-        InheritanceDollar.Lot memory lot = lots[lotIndex];
+        Lot memory lot = lots[lotIndex];
         if (lot.amount == 0) return;
         if (block.timestamp >= lot.unlockTime) return;
 

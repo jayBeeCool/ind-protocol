@@ -73,7 +73,7 @@ contract InvariantHandlerTest is StdInvariant, Test {
         assertEq(bal, locked + spend);
 
         uint256 h = ind.headOf(a);
-        InheritanceDollar.Lot[] memory lots = ind.getLots(a);
+        Lot[] memory lots = ind.getLots(a);
         assertTrue(h <= lots.length);
 
         uint256 start = h > 25 ? (h - 25) : 0;

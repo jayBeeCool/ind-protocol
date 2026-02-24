@@ -257,7 +257,7 @@ vm.prank(bob);
 
         vm.prank(signing);
         ind.transfer(bob, 10 ether);
-InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
+Lot[] memory lots = ind.getLots(bob);
         assertEq(lots.length, 1);
         assertEq(lots[0].senderOwner, alice); // must be logical owner, not signingKey
     }

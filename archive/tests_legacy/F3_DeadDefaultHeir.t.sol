@@ -39,7 +39,7 @@ vm.prank(rSK);
         ind.transferWithInheritance(rSK, 10 ether, uint64(86400), bytes32("X"));
 
         // get lot index (last one)
-        InheritanceDollar.Lot[] memory lots = ind.getLots(rSK);
+        Lot[] memory lots = ind.getLots(rSK);
         uint256 lotIndex = lots.length - 1;
 
         // warp beyond DEAD_AFTER_SECONDS (also beyond unlock)
@@ -82,7 +82,7 @@ vm.prank(rSK);
         vm.prank(sSK);
         ind.transferWithInheritance(rSK, 7 ether, uint64(86400), bytes32("Y"));
 
-        InheritanceDollar.Lot[] memory lots = ind.getLots(rSK);
+        Lot[] memory lots = ind.getLots(rSK);
         uint256 lotIndex = lots.length - 1;
 
         uint256 supplyBefore = ind.totalSupply();
