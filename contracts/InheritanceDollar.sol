@@ -284,6 +284,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
 
     // F03: last time an owner signingKey performed a signed outgoing action
     mapping(address => uint64) private _lastSignedOutTs;
+    mapping(address => uint64) private _lastRenewTs;
 
     // -------- EIP-712 typehashes --------
     bytes32 private constant TRANSFER_TYPEHASH = keccak256(
@@ -564,38 +565,19 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         }
 
         // both dead -> defaultHeir S1 (last resort) then burn
+        // both dead -> defaultHeir S1 (last resort) then burn
         address heir = _defaultHeir[recipOwner];
         if (heir != address(0)) {
             address heirOwner = _logicalOwnerOf(heir);
-            if (!_isDead(heirOwner)) {
-                // send to heir; if heir is an initialized owner, _update redirect will push to its signing key.
+            if (heirOwner == address(0) || !_isDead(heirOwner)) {
+                /* compute actual receiver first */
                 super._transfer(recipient, heir, amount);
-
-                // also add immediate spendable lot to the actual receiver (heir or its signingKey after redirect)
-                address actual = heir;
-                if (registry.isInitialized(heir)) {
-                    address sk = registry.signingKeyOf(heir);
-                    if (sk != address(0)) actual = sk;
-                }
-                _lots[actual].push(
-                    Lot({
-                        senderOwner: address(0),
-                        // casting to uint128 is safe because MAX_SUPPLY == type(uint128).max
-                        // forge-lint: disable-next-line(unsafe-typecast)
-                        amount: uint128(amount),
-                        createdAt: uint64(block.timestamp),
-                        minUnlockTime: uint64(block.timestamp),
-                        unlockTime: uint64(block.timestamp),
-                        characteristic: bytes32(0)
-                    })
-                );
 
                 emit LotSwept(
                     recipient,
                     lotIndex,
-                    actual,
-                    amount, // safe literal tag
-                    // forge-lint: disable-next-line(unsafe-typecast)
+                    heir,
+                    amount,
                     bytes32("HEIR")
                 );
                 return;
@@ -862,11 +844,33 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         _lastSignedOutTs[ownerLogical] = uint64(block.timestamp);
     }
 
-    function _isDead(address ownerLogical) internal view returns (bool) {
-        uint64 last = _lastSignedOutTs[ownerLogical];
-        if (last == 0) return false;
-        return uint64(block.timestamp) > last + DEAD_AFTER_SECONDS;
+    function renewLiveness() public {
+        address ownerLogical = _logicalOwnerOf(msg.sender);
+        _lastRenewTs[ownerLogical] = uint64(block.timestamp);
     }
+
+    
+
+function _isDead(address ownerLogical) internal view returns (bool) {
+        uint64 spend = _lastSignedOutTs[ownerLogical];
+        uint64 renew = _lastRenewTs[ownerLogical];
+
+        // Never-seen address is never considered dead
+        if (spend == 0 && renew == 0) return false;
+
+        uint256 threshold = uint256(DEAD_AFTER_SECONDS);
+
+        bool spendExpired = (spend == 0)
+            ? true
+            : block.timestamp > uint256(spend) + threshold;
+
+        bool renewExpired = (renew == 0)
+            ? true
+            : block.timestamp > uint256(renew) + threshold;
+
+        return spendExpired && renewExpired;
+}
+
 
     function _transferWithInheritance(
         address sender,
