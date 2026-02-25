@@ -871,6 +871,25 @@ function _isDead(address ownerLogical) internal view returns (bool) {
         return spendExpired && renewExpired;
 }
 
+function _isDeadStrict(address ownerLogical) internal view returns (bool) {
+        uint64 spend = _lastSignedOutTs[ownerLogical];
+        uint64 renew = _lastRenewTs[ownerLogical];
+
+        // Never-seen => treat as dead (STRICT)
+        if (spend == 0 && renew == 0) return true;
+
+        uint256 threshold = uint256(DEAD_AFTER_SECONDS);
+
+        bool spendExpired = (spend == 0)
+            ? true
+            : block.timestamp > uint256(spend) + threshold;
+
+        bool renewExpired = (renew == 0)
+            ? true
+            : block.timestamp > uint256(renew) + threshold;
+
+        return spendExpired && renewExpired;
+}
 
     function _transferWithInheritance(
         address sender,
