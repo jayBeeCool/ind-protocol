@@ -568,7 +568,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         }
 
         // both dead -> defaultHeir S1 (last resort) then burn
-        // both dead -> defaultHeir S1 (last resort) then burn
         address heir = _defaultHeir[recipOwner];
         if (heir != address(0)) {
             address heirOwner = _logicalOwnerOf(heir);
@@ -765,9 +764,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function keepAlive() external {
-        // renew tracked on logical owner (AND-liveness)
-        address owner = _logicalOwnerOf(msg.sender);
-        _touchRenew(owner);
+        _touchRenew(msg.sender);
     }
 
     function _avgAccumulate(address a) internal {
@@ -901,7 +898,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // block transfers to dead recipients (recipient is the heir of this transfer)
         address recipOwner = _logicalOwnerOf(recipient);
         if (_isDead(recipOwner)) revert RecipientDead();
-
         recipient = _resolveRecipient(recipient);
 
         // Resolve logical owner (if sender is signingKey)
