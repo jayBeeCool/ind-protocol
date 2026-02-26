@@ -217,6 +217,8 @@ contract INDKeyRegistry is AccessControl {
 /// Inheritance Dollar Token
 /// ------------------------------------------------------------------------
 contract InheritanceDollar is ERC20Permit, AccessControl {
+    error RecipientDead();
+
     using ECDSA for bytes32;
     using Gregorian for uint256;
 
@@ -898,7 +900,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     ) internal {
         // block transfers to dead recipients (recipient is the heir of this transfer)
         address recipOwner = _logicalOwnerOf(recipient);
-        require(!_isDead(recipOwner), "recipient-dead");
+        if (_isDead(recipOwner)) revert RecipientDead();
 
         recipient = _resolveRecipient(recipient);
 
