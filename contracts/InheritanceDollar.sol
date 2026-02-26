@@ -745,8 +745,21 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     function _touchSpend(address actor) internal {
         // actor can be signingKey or revokeKey; map to logical owner
         address owner = _logicalOwnerOf(actor);
+
+        _lastSignedOutTs[owner] = uint64(block.timestamp);
         uint16 y = uint256(block.timestamp).yearOf();
         emit SpendTouched(owner, y);
+    }
+
+    function _touchRenew(address actor) internal {
+        address owner = _logicalOwnerOf(actor);
+        _lastRenewTs[owner] = uint64(block.timestamp);
+    }
+
+    function keepAlive() external {
+        // renew tracked on logical owner (AND-liveness)
+        address owner = _logicalOwnerOf(msg.sender);
+        _touchRenew(owner);
     }
 
     function _avgAccumulate(address a) internal {
