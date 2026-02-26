@@ -49,7 +49,6 @@ contract INDKeyRegistry is AccessControl {
     event RevokeNonceUsed(address indexed owner, uint256 nonce);
 
     constructor(address admin) {
-
         require(admin != address(0), "admin=0");
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(REGISTRY_ADMIN_ROLE, admin);
@@ -232,9 +231,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     uint64 public constant MAX_WAIT_SECONDS = uint64(50 * 366 days);
 
     // Liveness tracking: last year an owner signed/spent
-    mapping(address => uint16) internal _lastSpendYear;
-    uint16 public constant INACTIVITY_YEARS = 7;
-    uint16 public constant MAX_WAIT_YEARS = 50;
     uint256 public constant MAX_SUPPLY = type(uint128).max;
 
     INDKeyRegistry public immutable registry;
@@ -323,7 +319,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         ERC20("Inheritance Dollar", "IND")
         ERC20Permit("Inheritance Dollar")
     {
-
         require(admin != address(0), "admin=0");
         require(address(keyRegistry) != address(0), "registry=0");
 
@@ -337,7 +332,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Owner-receive safety: if someone sends/mints to an initialized owner address,
     // redirect to its signingKey so funds are never trapped on owner-disabled address.
     // --------------------------------------------------------------------
-                        function _resolveRecipient(address to) internal view returns (address) {
+    function _resolveRecipient(address to) internal view returns (address) {
         if (to == address(0)) return to;
 
         // If logical owner initialized → redirect to signingKey
@@ -366,7 +361,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return _head[account];
     }
 
-        function spendableBalanceOf(address account) public view returns (uint256) {
+    function spendableBalanceOf(address account) public view returns (uint256) {
         Lot[] storage arr = _lots[account];
         uint256 sum;
         uint64 nowTs = uint64(block.timestamp);
@@ -382,7 +377,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return sum;
     }
 
-        function lockedBalanceOf(address account) public view returns (uint256) {
+    function lockedBalanceOf(address account) public view returns (uint256) {
         Lot[] storage arr = _lots[account];
         uint256 sum;
         uint64 nowTs = uint64(block.timestamp);
@@ -431,7 +426,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
-    require(!registry.isInitialized(from), "owner-disabled");
+        require(!registry.isInitialized(from), "owner-disabled");
         uint256 allowanceCur = allowance(from, msg.sender);
         require(allowanceCur >= amount, "insufficient allowance");
         unchecked {
@@ -573,13 +568,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 /* compute actual receiver first */
                 super._transfer(recipient, heir, amount);
 
-                emit LotSwept(
-                    recipient,
-                    lotIndex,
-                    heir,
-                    amount,
-                    bytes32("HEIR")
-                );
+                emit LotSwept(recipient, lotIndex, heir, amount, bytes32("HEIR"));
                 return;
             }
         }
@@ -849,9 +838,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         _lastRenewTs[ownerLogical] = uint64(block.timestamp);
     }
 
-    
-
-function _isDead(address ownerLogical) internal view returns (bool) {
+    function _isDead(address ownerLogical) internal view returns (bool) {
         uint64 spend = _lastSignedOutTs[ownerLogical];
         uint64 renew = _lastRenewTs[ownerLogical];
 
@@ -860,18 +847,14 @@ function _isDead(address ownerLogical) internal view returns (bool) {
 
         uint256 threshold = uint256(DEAD_AFTER_SECONDS);
 
-        bool spendExpired = (spend == 0)
-            ? true
-            : block.timestamp > uint256(spend) + threshold;
+        bool spendExpired = (spend == 0) ? true : block.timestamp > uint256(spend) + threshold;
 
-        bool renewExpired = (renew == 0)
-            ? true
-            : block.timestamp > uint256(renew) + threshold;
+        bool renewExpired = (renew == 0) ? true : block.timestamp > uint256(renew) + threshold;
 
         return spendExpired && renewExpired;
-}
+    }
 
-function _isDeadStrict(address ownerLogical) internal view returns (bool) {
+    function _isDeadStrict(address ownerLogical) internal view returns (bool) {
         uint64 spend = _lastSignedOutTs[ownerLogical];
         uint64 renew = _lastRenewTs[ownerLogical];
 
@@ -880,16 +863,12 @@ function _isDeadStrict(address ownerLogical) internal view returns (bool) {
 
         uint256 threshold = uint256(DEAD_AFTER_SECONDS);
 
-        bool spendExpired = (spend == 0)
-            ? true
-            : block.timestamp > uint256(spend) + threshold;
+        bool spendExpired = (spend == 0) ? true : block.timestamp > uint256(spend) + threshold;
 
-        bool renewExpired = (renew == 0)
-            ? true
-            : block.timestamp > uint256(renew) + threshold;
+        bool renewExpired = (renew == 0) ? true : block.timestamp > uint256(renew) + threshold;
 
         return spendExpired && renewExpired;
-}
+    }
 
     function _transferWithInheritance(
         address sender,
@@ -932,7 +911,7 @@ function _isDeadStrict(address ownerLogical) internal view returns (bool) {
         emit TransferWithInheritance(sender, recipient, amount, unlockAt, minUnlock, characteristic, lotIndex);
     }
 
-        function _consumeSpendableLots(address owner, uint256 amount) internal {
+    function _consumeSpendableLots(address owner, uint256 amount) internal {
         Lot[] storage arr = _lots[owner];
         uint256 remaining = amount;
         uint64 nowTs = uint64(block.timestamp);
@@ -956,7 +935,6 @@ function _isDeadStrict(address ownerLogical) internal view returns (bool) {
             }
         }
 
-        
         // F02A GC trigger: compact only when head moved far enough to matter.
         // - avoid doing it for small arrays
         // - do it when head > 64 and head is past half of the array
@@ -967,8 +945,6 @@ function _isDeadStrict(address ownerLogical) internal view returns (bool) {
                 _compactLots(owner);
             }
         }
-
-
 
         require(remaining == 0, "insufficient-spendable");
 
@@ -1004,7 +980,6 @@ function _isDeadStrict(address ownerLogical) internal view returns (bool) {
 
         _head[owner] = 0;
     }
-
 
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         to = _resolveRecipient(to);
