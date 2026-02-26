@@ -32,8 +32,10 @@ contract F2_Liveness_AND_Test is InheritanceDollarTest {
         vm.prank(rSK); assertTrue(ind.transfer(address(0xD00D), 1));
 
         // create a locked lot to recipient signing key
+        
+uint64 wait = uint64(ind.MIN_WAIT_SECONDS());
         vm.prank(sSK);
-        ind.transferWithInheritance(rSK, 10 ether, ind.MIN_WAIT_SECONDS(), bytes32("X"));
+        ind.transferWithInheritance(rSK, 10 ether, wait, bytes32("X"));
         uint256 lotIndex = ind.getLots(rSK).length - 1;
 
         // Move close to 7y: let "renew" become old (we do NOT call keepAlive)
@@ -49,15 +51,12 @@ contract F2_Liveness_AND_Test is InheritanceDollarTest {
         uint256 supplyBefore = ind.totalSupply();
         uint256 rBefore = ind.balanceOf(rSK);
 
+        vm.expectRevert(bytes("recipient-alive"));
         ind.sweepLot(rSK, lotIndex);
 
-        uint256 supplyAfter = ind.totalSupply();
-        uint256 rAfter = ind.balanceOf(rSK);
-
-        // Not burned
-        assertEq(supplyAfter, supplyBefore);
-        // Recipient kept (locked->spendable inside its balance; balance stays >= previous)
-        assertGe(rAfter, rBefore);
+        // state unchanged (implicit by revert)
+        assertEq(ind.totalSupply(), supplyBefore);
+        assertEq(ind.balanceOf(rSK), rBefore);
     }
 
     function test_liveness_AND_renew_recent_blocks_death_even_if_spend_old() public {
@@ -80,27 +79,24 @@ contract F2_Liveness_AND_Test is InheritanceDollarTest {
         vm.prank(sSK); assertTrue(ind.transfer(address(0xD00D), 1));
         vm.prank(rSK); assertTrue(ind.transfer(address(0xD00D), 1));
 
+        
+uint64 wait = uint64(ind.MIN_WAIT_SECONDS());
         vm.prank(sSK);
-        ind.transferWithInheritance(rSK, 9 ether, ind.MIN_WAIT_SECONDS(), bytes32("Y"));
+        ind.transferWithInheritance(rSK, 9 ether, wait, bytes32("Y"));
         uint256 lotIndex = ind.getLots(rSK).length - 1;
 
         // Make spend old: go to just beyond 7y, but refresh "renew" right before (keepAlive / avg tick).
         // Prefer keepAlive() if exists; fallback to a zero-amount self-transfer if protocol uses that for renew (should not),
         // otherwise this test will fail and you incolli i simboli disponibili.
         vm.warp(block.timestamp + uint256(ind.DEAD_AFTER_SECONDS()) - 1);
-
-        // Try keepAlive-like call if present
-        (bool ok,) = address(ind).call(abi.encodeWithSignature("keepAlive()"));
-        if (!ok) {
-            // Try avg touch if present (common name)
-            (ok,) = address(ind).call(abi.encodeWithSignature("keepAliveAvg()"));
-        }
-        require(ok, "no keepAlive-like method found; rg keepAlive in contracts/InheritanceDollar.sol and re-run");
-
+        // refresh RENEW on the recipient owner via its signing key
+        vm.prank(rSK);
+        ind.keepAlive();
         // Now go beyond 7y: spend expired, renew NOT expired => must NOT be dead
         vm.warp(block.timestamp + 2);
 
         uint256 supplyBefore = ind.totalSupply();
+        vm.expectRevert(bytes("recipient-alive"));
         ind.sweepLot(rSK, lotIndex);
         assertEq(ind.totalSupply(), supplyBefore);
     }
