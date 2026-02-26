@@ -257,7 +257,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     mapping(address => AvgState) private _avg;
 
     event DefaultHeirSet(address indexed owner, address indexed heir);
-    event SpendTouched(address indexed owner, uint16 year);
     event LotSwept(
         address indexed recipient, uint256 indexed lotIndex, address indexed to, uint256 amount, bytes32 action
     );
@@ -754,8 +753,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         address owner = _logicalOwnerOf(actor);
 
         _lastSignedOutTs[owner] = uint64(block.timestamp);
-        uint16 y = uint256(block.timestamp).yearOf();
-        emit SpendTouched(owner, y);
     }
 
     function _touchRenew(address actor) internal {
