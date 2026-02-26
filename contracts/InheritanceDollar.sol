@@ -896,6 +896,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 waitSeconds,
         bytes32 characteristic
     ) internal {
+        // block transfers to dead recipients (recipient is the heir of this transfer)
+        address recipOwner = _logicalOwnerOf(recipient);
+        require(!_isDead(recipOwner), "recipient-dead");
+
         recipient = _resolveRecipient(recipient);
 
         // Resolve logical owner (if sender is signingKey)
