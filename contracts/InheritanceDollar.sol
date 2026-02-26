@@ -484,6 +484,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     function activateKeysAndMigrateWithHeir(address signingKey, address revokeKey, address defaultHeir) external {
         _activateKeysAndMigrate(signingKey, revokeKey);
         if (defaultHeir != address(0)) {
+            address heirOwner = _logicalOwnerOf(defaultHeir);
+            require(!_isDead(heirOwner), "heir-dead");
             _defaultHeir[msg.sender] = defaultHeir;
             emit DefaultHeirSet(msg.sender, defaultHeir);
         }
@@ -494,6 +496,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         address rk = registry.revokeKeyOf(owner);
         require(rk != address(0), "no-revoke");
         require(msg.sender == rk, "not-revoke");
+        if (newHeir != address(0)) {
+            address heirOwner = _logicalOwnerOf(newHeir);
+            require(!_isDead(heirOwner), "heir-dead");
+        }
         _defaultHeir[owner] = newHeir;
         emit DefaultHeirSet(owner, newHeir);
         // note: does NOT count as spend (no funds moved)
