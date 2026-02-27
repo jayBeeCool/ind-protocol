@@ -7,14 +7,14 @@ contract F3_DeadDefaultHeir_Test is InheritanceDollarTest {
     function test_F3_bothDead_goesToDefaultHeir() public {
         // owners + keys
         address sOwner = address(0xA11CE);
-        address sSK    = address(0xA11C3);
-        address sRK    = address(0xA11C4);
+        address sSK = address(0xA11C3);
+        address sRK = address(0xA11C4);
 
         address rOwner = address(0xB0B01);
-        address rSK    = address(0xB0B02);
-        address rRK    = address(0xB0B03);
+        address rSK = address(0xB0B02);
+        address rRK = address(0xB0B03);
 
-        address heir   = address(0xC0FFEE);
+        address heir = address(0xC0FFEE);
 
         // initialize keys + set default heir for recipient owner
         vm.prank(sOwner);
@@ -28,13 +28,13 @@ contract F3_DeadDefaultHeir_Test is InheritanceDollarTest {
         ind.mint(sSK, 100 ether);
         ind.mint(rSK, 2 ether);
         vm.stopPrank();
-// make BOTH owners "not-last=0" then dead later:
+        // make BOTH owners "not-last=0" then dead later:
         // any outgoing transfer from signingKey touches _lastSignedOutTs[owner]
         vm.prank(sSK);
         ind.transfer(address(0xD00D), 1);
-vm.prank(rSK);
+        vm.prank(rSK);
         ind.transfer(address(0xD00D), 1);
-// create the inheritance lot from sender signingKey to recipient signingKey
+        // create the inheritance lot from sender signingKey to recipient signingKey
         vm.prank(sSK);
         ind.transferWithInheritance(rSK, 10 ether, uint64(86400), bytes32("X"));
 
@@ -55,12 +55,12 @@ vm.prank(rSK);
 
     function test_F3_bothDead_noHeir_burns() public {
         address sOwner = address(0xAA01);
-        address sSK    = address(0xAA02);
-        address sRK    = address(0xAA03);
+        address sSK = address(0xAA02);
+        address sRK = address(0xAA03);
 
         address rOwner = address(0xBB01);
-        address rSK    = address(0xBB02);
-        address rRK    = address(0xBB03);
+        address rSK = address(0xBB02);
+        address rRK = address(0xBB03);
 
         // init keys, NO default heir set for recipient
         vm.prank(sOwner);
@@ -73,12 +73,12 @@ vm.prank(rSK);
         ind.mint(sSK, 100 ether);
         ind.mint(rSK, 2 ether);
         vm.stopPrank();
-// touch outgoing for both to enable dead detection later
+        // touch outgoing for both to enable dead detection later
         vm.prank(sSK);
         ind.transfer(address(0xD00D), 1);
-vm.prank(rSK);
+        vm.prank(rSK);
         ind.transfer(address(0xD00D), 1);
-// create lot
+        // create lot
         vm.prank(sSK);
         ind.transferWithInheritance(rSK, 7 ether, uint64(86400), bytes32("Y"));
 

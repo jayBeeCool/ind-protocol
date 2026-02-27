@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "contracts/InheritanceDollarCompat.sol";
+import "../../contracts/InheritanceDollarCompat.sol";
 
 contract F2_RedirectOwnerReceive_Test is Test {
     INDKeyRegistry reg;
@@ -49,7 +49,7 @@ contract F2_RedirectOwnerReceive_Test is Test {
 
         // bob sends to OWNER address, must end up at signing
         vm.prank(bob);
-        assertTrue(ind.transfer(owner, 10 ether)); 
+        assertTrue(ind.transfer(owner, 10 ether));
 
         assertEq(ind.balanceOf(owner), 0);
         assertEq(ind.balanceOf(signing), 110 ether); // 100 + 10

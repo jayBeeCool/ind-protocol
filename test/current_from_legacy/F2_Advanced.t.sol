@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "contracts/InheritanceDollarCompat.sol";
+import "../../contracts/InheritanceDollarCompat.sol";
 
 contract F2_Advanced_Test is Test {
     INDKeyRegistry reg;
@@ -45,7 +45,7 @@ contract F2_Advanced_Test is Test {
 
         vm.prank(signing);
         // raw addresses are allowed (ERC20-compatible); no revert expected
-        assertTrue(ind.transfer(raw, 1 ether)); 
+        assertTrue(ind.transfer(raw, 1 ether));
     }
 
     function test_send_to_initialized_owner_redirects_to_signing() public {

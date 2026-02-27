@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "contracts/InheritanceDollarCompat.sol";
+import "../../contracts/InheritanceDollarCompat.sol";
 
 contract INDHandler is Test {
     InheritanceDollar public ind;
@@ -85,7 +85,7 @@ contract INDHandler is Test {
         uint256 amt = bound(amtSeed, 1, spendable);
 
         vm.prank(from);
-        assertTrue(ind.transfer(to, amt)); 
+        assertTrue(ind.transfer(to, amt));
     }
 
     function actTransferWithInheritance(uint256 fromSeed, uint256 toSeed, uint256 amtSeed, uint256 waitSeed) external {

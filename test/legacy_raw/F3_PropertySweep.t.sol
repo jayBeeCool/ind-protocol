@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "../contracts/InheritanceDollar.sol";
+import "../../contracts/InheritanceDollar.sol";
 
 contract F3_PropertySweep_Test is Test {
     INDKeyRegistry reg;
@@ -10,7 +10,7 @@ contract F3_PropertySweep_Test is Test {
 
     address admin = address(0xA11CE);
     address alice = address(0xA);
-    address bob   = address(0xB);
+    address bob = address(0xB);
 
     function setUp() public {
         reg = new INDKeyRegistry(admin);
@@ -34,8 +34,7 @@ contract F3_PropertySweep_Test is Test {
         uint256 supplyBefore = ind.totalSupply();
 
         // attempt sweep
-        try ind.sweepLot(bob, 0) {
-        } catch {}
+        try ind.sweepLot(bob, 0) {} catch {}
 
         uint256 supplyAfter = ind.totalSupply();
 
@@ -68,8 +67,7 @@ contract F3_PropertySweep_Test is Test {
         uint256 supplyBefore = ind.totalSupply();
 
         // Attempt sweep (recipient still alive)
-        try ind.sweepLot(bob, 0) {
-        } catch {}
+        try ind.sweepLot(bob, 0) {} catch {}
 
         uint256 supplyAfter = ind.totalSupply();
 
@@ -77,15 +75,14 @@ contract F3_PropertySweep_Test is Test {
         assertEq(supplyAfter, supplyBefore);
     }
 
-
     function test_property_burn_happens_only_when_fully_dead() public {
         address sOwner = address(0xAA01);
-        address sSK    = address(0xAA02);
-        address sRK    = address(0xAA03);
+        address sSK = address(0xAA02);
+        address sRK = address(0xAA03);
 
         address rOwner = address(0xBB01);
-        address rSK    = address(0xBB02);
-        address rRK    = address(0xBB03);
+        address rSK = address(0xBB02);
+        address rRK = address(0xBB03);
 
         // initialize keys
         vm.prank(sOwner);
@@ -109,8 +106,8 @@ contract F3_PropertySweep_Test is Test {
         ind.transfer(address(0xD00D), 1);
 
         // create inheritance lot
-        
-vm.startPrank(sSK);
+
+        vm.startPrank(sSK);
         ind.transferWithInheritance(rSK, 10 ether, ind.MIN_WAIT_SECONDS(), bytes32("X"));
         vm.stopPrank();
 
@@ -127,5 +124,4 @@ vm.startPrank(sSK);
         // since both dead and no heir, must burn
         assertEq(supplyBefore - supplyAfter, 10 ether);
     }
-
 }

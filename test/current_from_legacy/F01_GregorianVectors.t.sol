@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "contracts/lib/Gregorian.sol";
 
 contract F01_GregorianVectors_Test is Test {
-
     function test_yearOf_epoch() public {
         assertEq(Gregorian.yearOf(0), 1970);
     }
