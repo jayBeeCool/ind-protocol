@@ -357,6 +357,23 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Views
     // --------------------------------------------------------------------
 
+    /// @notice Standard getter for a single lot (tuple-return, test/audit friendly).
+    function lotOf(address recipient, uint256 lotIndex)
+        external
+        view
+        returns (
+            address senderOwner,
+            uint256 amountRemaining,
+            uint64 unlockTime,
+            uint64 minUnlockTime,
+            bytes32 characteristic
+        )
+    {
+        require(lotIndex < _lots[recipient].length, "lotIndex-oob");
+        Lot storage lot = _lots[recipient][lotIndex];
+        return (lot.senderOwner, lot.amount, lot.unlockTime, lot.minUnlockTime, lot.characteristic);
+    }
+
     function getLots(address account) external view returns (Lot[] memory) {
         return _lots[account];
     }
@@ -595,6 +612,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function reduceUnlockTime(address recipient, uint256 lotIndex, uint64 newUnlockTime) external {
+        require(lotIndex < _lots[recipient].length, "lotIndex-oob");
+
         Lot storage lot = _lots[recipient][lotIndex];
         require(lot.amount != 0, "empty-lot");
 
@@ -617,6 +636,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function revoke(address recipient, uint256 lotIndex) external {
+        require(lotIndex < _lots[recipient].length, "lotIndex-oob");
+
         _touchSpend(msg.sender);
         Lot storage lot = _lots[recipient][lotIndex];
         uint256 amount = uint256(lot.amount);
