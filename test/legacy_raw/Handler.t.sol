@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "../contracts/InheritanceDollar.sol";
+import "../../contracts/InheritanceDollar.sol";
 
 contract INDHandler is Test {
     InheritanceDollar public ind;

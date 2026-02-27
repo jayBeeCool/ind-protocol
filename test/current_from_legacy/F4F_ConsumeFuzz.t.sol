@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "contracts/InheritanceDollarCompat.sol";
+import "../../contracts/InheritanceDollarCompat.sol";
 
 contract F4F_ConsumeFuzz is Test {
     INDKeyRegistry reg;
