@@ -52,7 +52,7 @@ contract InvariantTest is Test {
         bool initialized = reg.isInitialized(bob);
         if (spendable > 0 && !initialized) {
             vm.prank(bob);
-            assertTrue(ind.transfer(carl, 1 ether)); 
+            assertTrue(ind.transfer(carl, 1 ether));
         }
 
         uint256 headAfter = ind.headOf(bob);

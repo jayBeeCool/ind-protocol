@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import "./InheritanceDollar.t.sol";
 
 contract F4E_ConsumeEdge is InheritanceDollarTest {
-
     // sweepLot requires recipient DEAD.
     // To make recipient dead we must:
     // 1) have an initialized owner (rOwner) with a signingKey (rSK)
@@ -13,8 +12,8 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
     function test_doubleSweep_revertsEmpty() public {
         // recipient owner + keys
         address rOwner = address(0xBB01);
-        address rSK    = address(0xBB02);
-        address rRK    = address(0xBB03);
+        address rSK = address(0xBB02);
+        address rRK = address(0xBB03);
 
         // activate recipient keys (default heir = 0)
         vm.prank(rOwner);

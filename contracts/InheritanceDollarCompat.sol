@@ -7,7 +7,5 @@ import "./InheritanceDollar.sol";
 // It inherits everything from InheritanceDollar.
 // DO NOT override anything.
 contract InheritanceDollarCompat is InheritanceDollar {
-    constructor(address admin, INDKeyRegistry keyRegistry)
-        InheritanceDollar(admin, keyRegistry)
-    {}
+    constructor(address admin, INDKeyRegistry keyRegistry) InheritanceDollar(admin, keyRegistry) {}
 }

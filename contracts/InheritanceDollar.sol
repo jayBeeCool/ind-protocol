@@ -225,6 +225,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     uint64 public constant MIN_WAIT_SECONDS = 86400; // 24 hours
 
+    // Calendar-year based thresholds (Gregorian)
+    uint16 public constant INACTIVITY_YEARS = 7;
+    uint16 public constant MAX_WAIT_YEARS = 50;
     uint64 public constant DEAD_AFTER_SECONDS = uint64(7 * 365 days);
 
     // F03: account considered dead if no *signed outgoing* activity for this period
@@ -859,18 +862,88 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         _lastRenewTs[ownerLogical] = uint64(block.timestamp);
     }
 
+    /// @dev Shift a timestamp by `deltaYears` calendar years, preserving the offset within the UTC year.
+    ///      If the target year is shorter (leap/non-leap), clamp to (yearEndTs-1).
+    function _shiftByYears(uint64 baseTs, int16 deltaYears) internal pure returns (uint64) {
+        uint16 y = uint256(baseTs).yearOf();
+
+        // Normalize year so that:
+        // Gregorian.yearStartTs(y) <= baseTs < Gregorian.yearEndTs(y)
+        uint256 start = Gregorian.yearStartTs(y);
+
+        // If yearOf() is approximate (e.g. ignores leap days), baseTs can be < start: fix it
+        while (start > uint256(baseTs)) {
+            require(y > 1970, "year-oob");
+            unchecked {
+                y--;
+            }
+
+            start = Gregorian.yearStartTs(y);
+        }
+
+        uint256 end_ = Gregorian.yearEndTs(y);
+        while (uint256(baseTs) >= end_) {
+            require(y < type(uint16).max, "year-oob");
+            unchecked {
+                y++;
+            }
+            start = end_;
+            end_ = Gregorian.yearEndTs(y);
+        }
+
+        uint256 offset = uint256(baseTs) - start;
+
+        int256 ty = int256(uint256(y)) + int256(deltaYears);
+        int256 maxYear = int256(uint256(type(uint16).max));
+        if (ty < 1970) ty = 1970;
+        require(ty <= maxYear, "year-oob");
+
+        uint16 targetYear = uint16(uint256(ty));
+
+        uint256 tStart = Gregorian.yearStartTs(targetYear);
+        uint256 tEnd = Gregorian.yearEndTs(targetYear);
+
+        // Clamp offset into target year (safe even if year length differs)
+        uint256 shifted = tStart + offset;
+        if (shifted >= tEnd) shifted = tEnd - 1;
+
+        return uint64(shifted);
+    }
+
+    function _shiftBackByPolicy(uint64 baseTs, uint256 deltaSeconds) internal view returns (uint64) {
+        // Policy:
+        // - if deltaSeconds <= 365 days: pure seconds arithmetic
+        // - if deltaSeconds >= 365 days + 1 sec: calendar-based (gregorian nYears) + remainder seconds
+        if (deltaSeconds <= 365 days) {
+            return uint64(uint256(baseTs) - deltaSeconds);
+        }
+
+        uint256 nYears = deltaSeconds / 365 days;
+        uint256 rem = deltaSeconds % 365 days;
+
+        // calendar-year shift preserves offset within year; remainder is seconds-based
+        uint64 shifted = _shiftByYears(baseTs, -int16(int256(nYears)));
+
+        return uint64(uint256(shifted) - rem);
+    }
+
     function _isDead(address ownerLogical) internal view returns (bool) {
         uint64 spend = _lastSignedOutTs[ownerLogical];
         uint64 renew = _lastRenewTs[ownerLogical];
 
-        // Never-seen address is never considered dead
+        // Never-seen address is never considered dead (heir admission handled elsewhere)
         if (spend == 0 && renew == 0) return false;
 
-        uint256 threshold = uint256(DEAD_AFTER_SECONDS);
+        // If the chain time is within the first INACTIVITY_YEARS since 1970,
+        // nobody can be considered inactive "by years" yet.
+        uint16 nowYear = uint256(block.timestamp).yearOf();
+        if (nowYear < uint16(1970 + INACTIVITY_YEARS)) return false;
 
-        bool spendExpired = (spend == 0) ? true : block.timestamp > uint256(spend) + threshold;
+        // Calendar-year cutoff: "now minus INACTIVITY_YEARS" preserving offset within year
+        uint64 cutoff = _shiftByYears(uint64(block.timestamp), -int16(INACTIVITY_YEARS));
 
-        bool renewExpired = (renew == 0) ? true : block.timestamp > uint256(renew) + threshold;
+        bool spendExpired = (spend == 0) ? true : spend < cutoff;
+        bool renewExpired = (renew == 0) ? true : renew < cutoff;
 
         return spendExpired && renewExpired;
     }
@@ -882,11 +955,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // Never-seen => treat as dead (STRICT)
         if (spend == 0 && renew == 0) return true;
 
-        uint256 threshold = uint256(DEAD_AFTER_SECONDS);
+        uint64 cutoff = _shiftBackByPolicy(uint64(block.timestamp), uint256(DEAD_AFTER_SECONDS));
 
-        bool spendExpired = (spend == 0) ? true : block.timestamp > uint256(spend) + threshold;
-
-        bool renewExpired = (renew == 0) ? true : block.timestamp > uint256(renew) + threshold;
+        bool spendExpired = (spend == 0) ? true : spend < cutoff;
+        bool renewExpired = (renew == 0) ? true : renew < cutoff;
 
         return spendExpired && renewExpired;
     }

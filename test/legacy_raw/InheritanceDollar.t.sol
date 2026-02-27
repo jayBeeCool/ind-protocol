@@ -50,7 +50,7 @@ contract InheritanceDollarTest is Test {
         // Alice transfers 10 to Bob (default wait = 86400)
         vm.prank(alice);
         ind.transfer(bob, 10 ether);
-// Immediately after transfer
+        // Immediately after transfer
         assertEq(ind.balanceOf(bob), 10 ether);
         assertEq(ind.lockedBalanceOf(bob), 10 ether);
         assertEq(ind.spendableBalanceOf(bob), 0);
@@ -68,7 +68,7 @@ contract InheritanceDollarTest is Test {
 
         vm.prank(alice);
         ind.transfer(bob, 20 ether);
-uint256 balance = ind.balanceOf(bob);
+        uint256 balance = ind.balanceOf(bob);
         uint256 locked = ind.lockedBalanceOf(bob);
         uint256 spendable = ind.spendableBalanceOf(bob);
 
@@ -103,7 +103,7 @@ uint256 balance = ind.balanceOf(bob);
 
         vm.prank(alice);
         ind.transfer(bob, 10 ether);
-// Revoke before unlock
+        // Revoke before unlock
         vm.prank(alice);
         ind.revoke(bob, 0);
 
@@ -115,7 +115,7 @@ uint256 balance = ind.balanceOf(bob);
 
         vm.prank(alice);
         ind.transfer(bob, 10 ether);
-vm.warp(block.timestamp + 86400);
+        vm.warp(block.timestamp + 86400);
 
         vm.prank(alice);
         vm.expectRevert(bytes("already-unlocked"));
@@ -128,13 +128,13 @@ vm.warp(block.timestamp + 86400);
 
         vm.prank(alice);
         ind.transfer(bob, 20 ether);
-vm.prank(bob);
+        vm.prank(bob);
         ind.approve(alice, 20 ether);
 
         vm.prank(alice);
         vm.expectRevert(bytes("insufficient-spendable"));
         ind.transferFrom(bob, alice, 1 ether);
-}
+    }
 
     function test_separate_keys_should_control_revoke_but_currently_fail() public {
         vm.prank(admin);
@@ -142,7 +142,7 @@ vm.prank(bob);
 
         vm.prank(alice);
         ind.transfer(bob, 10 ether);
-// Simulate a different address trying revoke
+        // Simulate a different address trying revoke
         address revokeKey = address(0xDEAD);
 
         vm.prank(revokeKey);
@@ -164,7 +164,7 @@ vm.prank(bob);
         // signingKey creates a locked lot
         vm.prank(signing);
         ind.transfer(bob, 10 ether);
-// owner tries to revoke -> must fail (only revokeKey can)
+        // owner tries to revoke -> must fail (only revokeKey can)
         vm.prank(alice);
         vm.expectRevert(bytes("not-revoke"));
         ind.revoke(bob, 0);
@@ -184,7 +184,7 @@ vm.prank(bob);
         // signingKey creates locked lot
         vm.prank(signing);
         ind.transfer(bob, 10 ether);
-// revokeKey revokes successfully
+        // revokeKey revokes successfully
         vm.prank(revokeK);
         ind.revoke(bob, 0);
 
@@ -239,11 +239,11 @@ vm.prank(bob);
         // signingKey sends some IND back to owner (owner receives, but must be non-operational)
         vm.prank(signing);
         ind.transfer(alice, 1 ether);
-// owner tries to transfer -> MUST revert (owner-disabled)
+        // owner tries to transfer -> MUST revert (owner-disabled)
         vm.prank(alice);
         vm.expectRevert(bytes("owner-disabled"));
         ind.transfer(bob, 1 ether);
-}
+    }
 
     function test_lot_senderOwner_is_logical_owner_when_sent_by_signingKey() public {
         address signing = address(0x1111);
@@ -257,7 +257,7 @@ vm.prank(bob);
 
         vm.prank(signing);
         ind.transfer(bob, 10 ether);
-InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
+        InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
         assertEq(lots.length, 1);
         assertEq(lots[0].senderOwner, alice); // must be logical owner, not signingKey
     }
@@ -277,7 +277,7 @@ InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
         // signingKey sends locked lot to bob
         vm.prank(signing);
         ind.transfer(bob, 10 ether);
-// revokeKey revokes -> refund must go to signingKey (owner should not regain balance)
+        // revokeKey revokes -> refund must go to signingKey (owner should not regain balance)
         vm.prank(revokeK);
         ind.revoke(bob, 0);
 
@@ -293,8 +293,8 @@ InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
         // spam lots to Bob (locked)
         vm.startPrank(alice);
         for (uint256 i = 0; i < 200; i++) {
-        ind.transfer(bob, 1 ether);
-}
+            ind.transfer(bob, 1 ether);
+        }
         vm.stopPrank();
 
         // unlock all
@@ -307,7 +307,7 @@ InheritanceDollar.Lot[] memory lots = ind.getLots(bob);
         address carl = address(0xC);
         vm.prank(bob);
         ind.transfer(carl, 200 ether);
-// after consumption, spendable should be 0 and head should have advanced
+        // after consumption, spendable should be 0 and head should have advanced
         assertEq(ind.spendableBalanceOf(bob), 0);
         assertGt(ind.headOf(bob), 0);
     }

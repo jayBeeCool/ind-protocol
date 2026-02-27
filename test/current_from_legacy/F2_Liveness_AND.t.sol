@@ -12,28 +12,32 @@ contract F2_Liveness_AND_Test is InheritanceDollarTest {
     function test_liveness_AND_spend_recent_blocks_death_even_if_renew_old() public {
         // owners + keys
         address sOwner = address(0xAA01);
-        address sSK    = address(0xAA02);
-        address sRK    = address(0xAA03);
+        address sSK = address(0xAA02);
+        address sRK = address(0xAA03);
 
         address rOwner = address(0xBB01);
-        address rSK    = address(0xBB02);
-        address rRK    = address(0xBB03);
+        address rSK = address(0xBB02);
+        address rRK = address(0xBB03);
 
         // init
         _setupOwnerWithKeys(sOwner, sSK, sRK, address(0));
         _setupOwnerWithKeys(rOwner, rSK, rRK, address(0));
 
         // fund sender + recipient signing keys
-        vm.prank(admin); ind.mint(sSK, 50 ether);
-        vm.prank(admin); ind.mint(rSK,  2 ether);
+        vm.prank(admin);
+        ind.mint(sSK, 50 ether);
+        vm.prank(admin);
+        ind.mint(rSK, 2 ether);
 
         // touch BOTH clocks at t0 via outgoing tx from both signing keys
-        vm.prank(sSK); assertTrue(ind.transfer(address(0xD00D), 1));
-        vm.prank(rSK); assertTrue(ind.transfer(address(0xD00D), 1));
+        vm.prank(sSK);
+        assertTrue(ind.transfer(address(0xD00D), 1));
+        vm.prank(rSK);
+        assertTrue(ind.transfer(address(0xD00D), 1));
 
         // create a locked lot to recipient signing key
-        
-uint64 wait = uint64(ind.MIN_WAIT_SECONDS());
+
+        uint64 wait = uint64(ind.MIN_WAIT_SECONDS());
         vm.prank(sSK);
         ind.transferWithInheritance(rSK, 10 ether, wait, bytes32("X"));
         uint256 lotIndex = ind.getLots(rSK).length - 1;
@@ -62,25 +66,28 @@ uint64 wait = uint64(ind.MIN_WAIT_SECONDS());
     function test_liveness_AND_renew_recent_blocks_death_even_if_spend_old() public {
         // owners + keys
         address sOwner = address(0xCC01);
-        address sSK    = address(0xCC02);
-        address sRK    = address(0xCC03);
+        address sSK = address(0xCC02);
+        address sRK = address(0xCC03);
 
         address rOwner = address(0xDD01);
-        address rSK    = address(0xDD02);
-        address rRK    = address(0xDD03);
+        address rSK = address(0xDD02);
+        address rRK = address(0xDD03);
 
         _setupOwnerWithKeys(sOwner, sSK, sRK, address(0));
         _setupOwnerWithKeys(rOwner, rSK, rRK, address(0));
 
-        vm.prank(admin); ind.mint(sSK, 50 ether);
-        vm.prank(admin); ind.mint(rSK,  2 ether);
+        vm.prank(admin);
+        ind.mint(sSK, 50 ether);
+        vm.prank(admin);
+        ind.mint(rSK, 2 ether);
 
         // Touch spend at t0 for both
-        vm.prank(sSK); assertTrue(ind.transfer(address(0xD00D), 1));
-        vm.prank(rSK); assertTrue(ind.transfer(address(0xD00D), 1));
+        vm.prank(sSK);
+        assertTrue(ind.transfer(address(0xD00D), 1));
+        vm.prank(rSK);
+        assertTrue(ind.transfer(address(0xD00D), 1));
 
-        
-uint64 wait = uint64(ind.MIN_WAIT_SECONDS());
+        uint64 wait = uint64(ind.MIN_WAIT_SECONDS());
         vm.prank(sSK);
         ind.transferWithInheritance(rSK, 9 ether, wait, bytes32("Y"));
         uint256 lotIndex = ind.getLots(rSK).length - 1;

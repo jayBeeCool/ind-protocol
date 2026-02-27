@@ -45,7 +45,7 @@ contract F2_Advanced_Test is Test {
 
         vm.prank(signing);
         // raw addresses are allowed (ERC20-compatible); no revert expected
-        assertTrue(ind.transfer(raw, 1 ether)); 
+        assertTrue(ind.transfer(raw, 1 ether));
     }
 
     function test_send_to_initialized_owner_redirects_to_signing() public {
