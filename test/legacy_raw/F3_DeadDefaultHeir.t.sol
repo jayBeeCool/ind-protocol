@@ -31,12 +31,12 @@ contract F3_DeadDefaultHeir_Test is InheritanceDollarTest {
         // make BOTH owners "not-last=0" then dead later:
         // any outgoing transfer from signingKey touches _lastSignedOutTs[owner]
         vm.prank(sSK);
-        ind.transfer(address(0xD00D), 1);
+        require(ind.transfer(address(0xD00D), 1));
         vm.prank(rSK);
-        ind.transfer(address(0xD00D), 1);
+        require(ind.transfer(address(0xD00D), 1));
         // create the inheritance lot from sender signingKey to recipient signingKey
         vm.prank(sSK);
-        ind.transferWithInheritance(rSK, 10 ether, uint64(86400), bytes32("X"));
+        ind.transferWithInheritance(rSK, 10 ether, uint64(86400), keccak256("X"));
 
         // get lot index (last one)
         InheritanceDollar.Lot[] memory lots = ind.getLots(rSK);
@@ -75,12 +75,12 @@ contract F3_DeadDefaultHeir_Test is InheritanceDollarTest {
         vm.stopPrank();
         // touch outgoing for both to enable dead detection later
         vm.prank(sSK);
-        ind.transfer(address(0xD00D), 1);
+        require(ind.transfer(address(0xD00D), 1));
         vm.prank(rSK);
-        ind.transfer(address(0xD00D), 1);
+        require(ind.transfer(address(0xD00D), 1));
         // create lot
         vm.prank(sSK);
-        ind.transferWithInheritance(rSK, 7 ether, uint64(86400), bytes32("Y"));
+        ind.transferWithInheritance(rSK, 7 ether, uint64(86400), keccak256("Y"));
 
         InheritanceDollar.Lot[] memory lots = ind.getLots(rSK);
         uint256 lotIndex = lots.length - 1;

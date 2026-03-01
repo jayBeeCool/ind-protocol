@@ -2,7 +2,9 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "../../contracts/InheritanceDollarCompat.sol";
+import {InheritanceDollarCompat} from "../../contracts/InheritanceDollarCompat.sol";
+
+import {INDKeyRegistry} from "../../contracts/InheritanceDollar.sol";
 
 contract F2_Advanced_Test is Test {
     INDKeyRegistry reg;

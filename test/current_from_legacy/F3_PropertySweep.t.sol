@@ -100,15 +100,13 @@ contract F3_PropertySweep_Test is Test {
 
         // touch outgoing so inactivity timer starts
         vm.prank(sSK);
-        ind.transfer(address(0xD00D), 1);
-
+        require(ind.transfer(address(0xD00D), 1));
         vm.prank(rSK);
-        ind.transfer(address(0xD00D), 1);
-
+        require(ind.transfer(address(0xD00D), 1));
         // create inheritance lot
 
         vm.startPrank(sSK);
-        ind.transferWithInheritance(rSK, 10 ether, ind.MIN_WAIT_SECONDS(), bytes32("X"));
+        ind.transferWithInheritance(rSK, 10 ether, ind.MIN_WAIT_SECONDS(), keccak256("X"));
         vm.stopPrank();
 
         // unlock + advance beyond DEAD_AFTER_SECONDS

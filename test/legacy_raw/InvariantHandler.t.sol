@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "forge-std/StdInvariant.sol";
 import "../../contracts/InheritanceDollar.sol";
+import "../../contracts/INDKeyRegistry.sol";
 import "./Handler.t.sol";
 
 contract InvariantHandlerTest is StdInvariant, Test {

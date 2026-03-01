@@ -1,24 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Script.sol";
-import "contracts/InheritanceDollar.sol";
-import "contracts/InheritanceDollarCompat.sol";
+import {Script} from "forge-std/Script.sol";
+import {InheritanceDollar} from "contracts/InheritanceDollar.sol";
+import {InheritanceDollarCompat} from "contracts/InheritanceDollarCompat.sol";
+import {INDKeyRegistry} from "contracts/INDKeyRegistry.sol";
 
 contract DeployIND is Script {
     function run() external {
         vm.startBroadcast();
 
-        // NOTE: adjust constructor args if your contracts require them.
-        // If InheritanceDollar has no constructor args, keep as-is.
-        InheritanceDollar core = new InheritanceDollar();
+        INDKeyRegistry registry = new INDKeyRegistry(msg.sender);
 
-        // If Compat wraps an existing core, adjust accordingly.
-        // If Compat has a different constructor, update here.
-        InheritanceDollarCompat compat = new InheritanceDollarCompat(address(core));
+        InheritanceDollar core = new InheritanceDollar(
+            msg.sender, // admin
+            registry // INDKeyRegistry (NOT address)
+        );
 
-        console2.log("InheritanceDollar:", address(core));
-        console2.log("InheritanceDollarCompat:", address(compat));
+        InheritanceDollarCompat compat = new InheritanceDollarCompat(
+            address(core),
+            registry // INDKeyRegistry (NOT address)
+        );
+
+        // silence unused var warning (optional)
+        compat;
 
         vm.stopBroadcast();
     }
