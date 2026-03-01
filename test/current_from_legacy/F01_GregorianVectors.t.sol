@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import {Gregorian} from "contracts/lib/Gregorian.sol";
+import "contracts/lib/Gregorian.sol";
 
 contract F01_GregorianVectors_Test is Test {
     function test_yearOf_epoch() public {
