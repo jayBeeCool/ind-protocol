@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
-import "./InheritanceDollar.t.sol";
+import {InheritanceDollarTest} from "./InheritanceDollar.t.sol";
 
 contract F2_Liveness_AND_Test is InheritanceDollarTest {
     function _setupOwnerWithKeys(address owner, address sk, address rk, address heir) internal {

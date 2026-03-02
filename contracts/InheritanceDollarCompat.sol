@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+import {InheritanceDollar} from "./InheritanceDollar.sol";
 
-import "./InheritanceDollar.sol";
+import {INDKeyRegistry} from "./INDKeyRegistry.sol";
+import {INDKeyRegistry} from "./INDKeyRegistry.sol";
 
 // Thin wrapper used only for legacy test compatibility.
 // It inherits everything from InheritanceDollar.

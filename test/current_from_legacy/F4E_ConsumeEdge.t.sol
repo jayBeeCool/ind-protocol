@@ -1,47 +1,47 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
-import "./InheritanceDollar.t.sol";
+import {InheritanceDollarTest} from "./InheritanceDollar.t.sol";
 
 contract F4E_ConsumeEdge is InheritanceDollarTest {
     // sweepLot requires recipient DEAD.
     // To make recipient dead we must:
-    // 1) have an initialized owner (rOwner) with a signingKey (rSK)
-    // 2) make rSK do at least one outgoing transfer (this sets _lastSignedOutTs[rOwner])
+    // 1) have an initialized owner (rOwner) with a signingKey (rSk)
+    // 2) make rSk do at least one outgoing transfer (this sets _lastSignedOutTs[rOwner])
     // 3) warp beyond DEAD_AFTER_SECONDS
     function test_doubleSweep_revertsEmpty() public {
         // recipient owner + keys
         address rOwner = address(0xBB01);
-        address rSK = address(0xBB02);
-        address rRK = address(0xBB03);
+        address rSk = address(0xBB02);
+        address rRk = address(0xBB03);
 
         // activate recipient keys (default heir = 0)
         vm.prank(rOwner);
-        ind.activateKeysAndMigrateWithHeir(rSK, rRK, address(0));
+        ind.activateKeysAndMigrateWithHeir(rSk, rRk, address(0));
 
-        // fund alice and create lot to rOwner (will be redirected to rSK)
+        // fund alice and create lot to rOwner (will be redirected to rSk)
         vm.prank(admin);
         ind.mint(alice, 20 ether);
 
         vm.prank(alice);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(rOwner, 10 ether);
 
         // unlock lots
         vm.warp(block.timestamp + 1 days);
 
         // touch signed outgoing for recipient owner (must be from signingKey!)
-        vm.prank(rSK);
+        vm.prank(rSk);
         ind.transfer(address(0xD00D), 1); // spends 1 wei from unlocked lot, sets lastSignedOutTs[rOwner]
 
         // now warp beyond dead threshold
         vm.warp(block.timestamp + uint256(ind.DEAD_AFTER_SECONDS()) + 1);
 
         // first sweep should succeed (refund path, since sender alice is "alive" by definition)
-        ind.sweepLot(rSK, 0);
+        ind.sweepLot(rSk, 0);
 
         // second sweep must revert empty-lot
         vm.expectRevert(bytes("empty-lot"));
-        ind.sweepLot(rSK, 0);
+        ind.sweepLot(rSk, 0);
     }
 
     function test_lockedCannotBeConsumedEarly() public {
@@ -53,6 +53,7 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
 
         vm.prank(bob);
         vm.expectRevert(bytes("insufficient-spendable"));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(alice, 1 ether);
     }
 
@@ -61,11 +62,13 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
         ind.mint(alice, 20 ether);
 
         vm.prank(alice);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(bob, 10 ether);
 
         vm.warp(block.timestamp + 1 days);
 
         vm.prank(bob);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(alice, 5 ether);
 
         // remaining must still be 5 ether spendable
@@ -88,6 +91,7 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
 
         // only first lot unlocked (10 ether)
         vm.prank(bob);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(alice, 7 ether);
 
         assertEq(ind.spendableBalanceOf(bob), 3 ether);

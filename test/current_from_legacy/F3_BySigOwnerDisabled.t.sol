@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
-import "./InheritanceDollar.t.sol";
+import {InheritanceDollarTest} from "./InheritanceDollar.t.sol";
 
 contract F3_BySigOwnerDisabled_Test is InheritanceDollarTest {
     function test_bySig_ownerDisabled_reverts() public {

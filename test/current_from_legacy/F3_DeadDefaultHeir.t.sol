@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
-import "./InheritanceDollar.t.sol";
+import {InheritanceDollar} from "../../contracts/InheritanceDollar.sol";
+import {InheritanceDollarTest} from "./InheritanceDollar.t.sol";
 
 contract F3_DeadDefaultHeir_Test is InheritanceDollarTest {
     function test_F3_bothDead_goesToDefaultHeir() public {
