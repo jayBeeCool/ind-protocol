@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "./lib/Gregorian.sol";
-import "./INDKeyRegistry.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Gregorian} from "./lib/Gregorian.sol";
+import {INDKeyRegistry} from "./INDKeyRegistry.sol";
 
 contract InheritanceDollar is ERC20Permit, AccessControl {
     error RecipientDead();
@@ -29,6 +30,13 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Liveness tracking: last year an owner signed/spent
     uint256 public constant MAX_SUPPLY = type(uint128).max;
 
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
+    // keep name "registry" for backward compatibility
+
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
+
+    // keep name "registry" for backward compatibility
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
     INDKeyRegistry public immutable registry;
 
     // --------------------------------------------------------------------
@@ -370,6 +378,15 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 /* compute actual receiver first */
                 super._transfer(recipient, heir, amount);
 
+                // forge-lint: disable-next-line(unsafe-typecast)
+                // safe: "HEIR" is 4 bytes <= 32 bytes
+
+                // forge-lint: disable-next-line(unsafe-typecast)
+
+                // safe: "HEIR" is 4 bytes <= 32 bytes
+
+                // safe: "HEIR" is 4 bytes <= 32 bytes
+                // forge-lint: disable-next-line(unsafe-typecast)
                 emit LotSwept(recipient, lotIndex, heir, amount, bytes32("HEIR"));
                 return;
             }
@@ -522,7 +539,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 nonce = registry.signingNonceOf(from);
 
         bytes32 structHash =
-            keccak256(abi.encode(TRANSFER_TYPEHASH, from, to, amount, waitSeconds, characteristic, nonce, deadline));
+        // forge-lint: disable-next-line(asm-keccak256)
+        keccak256(abi.encode(TRANSFER_TYPEHASH, from, to, amount, waitSeconds, characteristic, nonce, deadline));
 
         bytes32 digest = _hashTypedDataV4(structHash);
         address signer = digest.recover(signature);
@@ -689,6 +707,15 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         if (ty < 1970) ty = 1970;
         require(ty <= maxYear, "year-oob");
 
+        // forge-lint: disable-next-line(unsafe-typecast)
+        // safe: Gregorian year is bounded by conversion logic
+
+        // forge-lint: disable-next-line(unsafe-typecast)
+
+        // safe: Gregorian year is bounded by conversion logic
+
+        // safe: Gregorian year is bounded by conversion logic
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint16 targetYear = uint16(uint256(ty));
 
         uint256 tStart = Gregorian.yearStartTs(targetYear);
@@ -702,7 +729,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         return uint64(shifted);
     }
 
-    function _shiftBackByPolicy(uint64 baseTs, uint256 deltaSeconds) internal view returns (uint64) {
+    function _shiftBackByPolicy(uint64 baseTs, uint256 deltaSeconds) internal pure returns (uint64) {
         // Policy:
         // - if deltaSeconds <= 365 days: pure seconds arithmetic
         // - if deltaSeconds >= 365 days + 1 sec: calendar-based (gregorian nYears) + remainder seconds
@@ -837,9 +864,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // - avoid doing it for small arrays
         // - do it when head > 64 and head is past half of the array
         {
-            uint256 hGC = _head[owner];
-            uint256 lenGC = arr.length;
-            if (hGC > 64 && (hGC * 2) > lenGC) {
+            uint256 hGc = _head[owner];
+            uint256 lenGc = arr.length;
+            if (hGc > 64 && (hGc * 2) > lenGc) {
                 _compactLots(owner);
             }
         }

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
-import "forge-std/Test.sol";
-import "../../contracts/InheritanceDollar.sol";
+import {Test} from "forge-std/Test.sol";
+import "../../contracts/InheritanceDollarCompat.sol";
 
 contract F2_RedirectOwnerReceive_Test is Test {
     INDKeyRegistry reg;
