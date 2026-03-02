@@ -1,64 +1,62 @@
-# IND Protocol — Audit Notes (dev)
+# AUDIT MODE (FREEZE)
 
-This document is a pragmatic audit checklist + findings log.  
-Goal: identify consensus-breaking bugs, fund-loss paths, vault bypasses, and DoS vectors.
+Status: **AUDIT-FREEZE ACTIVE**
+Branch policy:
+- No new features.
+- Only: bugfixes, tests, documentation, audit notes.
+- Every change must include: rationale + risk + test proof.
 
 ## Scope
-- contracts/InheritanceDollar.sol
-- INDKeyRegistry (embedded)
-- tests/ (unit + invariant)
+This audit covers the IND protocol implementation in this repository:
+- `InheritanceDollar.sol` (core)
+- `InheritanceDollarCompat.sol` (compat wrapper)
+- `Gregorian.sol` (calendar support)
+- test suites in `test/`
 
-## High-level invariants (must always hold)
-1) ERC20: totalSupply() never exceeds MAX_SUPPLY
-2) For any account a: balanceOf(a) == lockedBalanceOf(a) + spendableBalanceOf(a)
-3) Spend requires spendable lots only (never spend locked)
-4) Vault ON: outgoing transfers AND approvals only to IND signing keys
-5) Receiving to initialized owner redirects to its signing key
-6) Revoke key is never a receiver address in the intended wallet model
+## Spec binding
+The normative source is `SPEC.md` (R1..R28).
+This audit focuses especially on:
+- Time rules (R1..)
+- Revocation key separation
+- Liveness/dead detection and sweeping
+- Gregorian trigger policy: **calendar-based when deltaSeconds >= 365d + 1s** (R25–R27)
 
-## Critical areas checklist
+## Critical invariants (must hold)
+### Funds / accounting
+- `balance == lockedBalance + spendableBalance` for any address.
+- Spending cannot consume locked lots.
+- Lot consumption must not skip partial lots.
 
-### A. Key registry correctness
-- [ ] ownerOfSigningKey mapping updated on signing replace
-- [ ] signingKey uniqueness (cannot be reused across owners)
-- [ ] revokeKey uniqueness (cannot be reused across owners)
-- [ ] rotateSigning: clears old mapping, sets new mapping
-- [ ] rotateRevoke: does not accidentally allow receiving / misuse
+### Time / unlock
+- `unlockTime >= now + MIN_WAIT_SECONDS` at creation.
+- `reduceUnlockTime`:
+  - only reduces (never increases)
+  - cannot reduce below `minUnlockTime`
+  - policy: for reductions:
+    - if deltaSeconds <= 365d => seconds arithmetic
+    - if deltaSeconds >= 365d+1s => gregorian/calendar-based + remainder seconds
 
-### B. Owner/signing resolution & redirect
-- [ ] senderOwner in lots is always the logical owner (even if sent by signingKey)
-- [ ] _resolveRecipient(to): if to is initialized owner -> redirect to signingKey
-- [ ] redirect never points to revokeKey
+### Revocation / authorization
+- revoke actions require revokeKey (cold key) when owner initialized.
+- transfer/spend requires signingKey (hot key) when owner initialized.
+- After unlock, revocation must be impossible (per lot rules).
 
-### C. Lots logic
-- [ ] MIN_WAIT_SECONDS enforced
-- [ ] MAX_WAIT_SECONDS enforced (anti-abuse)
-- [ ] reduceUnlockTime: only reduction; >= minUnlockTime
-- [ ] revoke: only before unlock; refunds to signingKey (or owner if not initialized)
-- [ ] revoke does not create locked funds on refund target
+### Liveness + sweeping
+- DEAD eligibility is deterministic per spec/implementation.
+- Sweeping an already empty lot must revert with deterministic error (`empty-lot`).
+- Sweep outcome order is deterministic (refund/heir/burn paths).
 
-### D. Spend accounting & head compaction
-- [ ] _consumeSpendableLots consumes only unlockTime <= now
-- [ ] head advances over zeros to prevent unbounded growth
-- [ ] head never skips non-zero lots
-- [ ] DoS: extreme lots count still bounded in gas? (best effort)
+## Attack surface checklist
+- Reentrancy: ERC20 transfer hooks not used; still verify external calls.
+- Signature replay: nonce handling, deadline checks, domain separator.
+- Key registry: uniqueness constraints for signingKey and revokeKey.
+- Edge cases: never-seen address, year boundaries, leap years.
 
-### E. Vault overlay (3.B + vault)
-- [ ] vaultOn only by signingKey of initialized owner
-- [ ] vaultOff only by revokeKey (immediate)
-- [ ] Vault ON forbids transfer to non-IND signing keys
-- [ ] Vault ON forbids approve/permit to non-IND signing keys
-- [ ] transferFrom cannot bypass vault restrictions
-- [ ] meta-tx paths also respect vault (because they call internal transfer path)
-- [ ] Ensure no bypass via internal refunds/mint paths
+## Evidence (tests)
+- Gregorian vectors: `F01_*`
+- Liveness/sweep: `F2_*`, `F3_*`
+- Consumption edges/fuzz: `F4E_*`, `F4F_*`
+- Invariants: `Invariant*.t.sol`
 
-### F. Liveness + default heir + burn
-- [ ] lastSpendYear updated ONLY by spend actions (not receive)
-- [ ] avg updates on both receive and send
-- [ ] dead detection year calc correct boundaries
-- [ ] both-dead => defaultHeir if alive else burn
-- [ ] defaultHeir optional; can be changed
-- [ ] defaultHeir cannot be revokeKey receiver by enforcement model
-
-## Findings log (fill as we review)
-- [ ] None yet
+## Freeze tags
+- `v1.1.1-audit-freeze` (main)

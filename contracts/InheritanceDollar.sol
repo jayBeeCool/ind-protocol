@@ -1,221 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "./lib/Gregorian.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Gregorian} from "./lib/Gregorian.sol";
+import {INDKeyRegistry} from "./INDKeyRegistry.sol";
 
-/*
-Inheritance Dollar (IND)
-
-RULES (FINAL):
-- All time values are expressed in SECONDS. 24h = 86400.
-- The sender chooses when the recipient will be able to spend the tokens (waitSeconds >= 86400).
-- For each transfer, a "lot" is created on the recipient.
-- Until unlockTime is reached, the original sender may:
-  1) reduce the unlockTime (only reduce, never increase),
-     but never below createdAt + 86400
-  2) revoke the transfer entirely, recovering the funds
-- Two separate keys per owner:
-  - signingKey (hot): authorizes transfers
-  - revokeKey (cold): authorizes reduce/revoke and key rotation
-- ERC20 standard compatibility + Permit (EIP-2612)
-- Meta-transactions via EIP-712 for maximum market compatibility
-*/
-
-/// ------------------------------------------------------------------------
-/// Key Registry
-/// ------------------------------------------------------------------------
-contract INDKeyRegistry is AccessControl {
-    bytes32 public constant REGISTRY_ADMIN_ROLE = keccak256("REGISTRY_ADMIN_ROLE");
-
-    struct Keys {
-        address signingKey; // hot key (transfers)
-        address revokeKey; // cold key (reduce/revoke)
-        uint256 signingNonce;
-        uint256 revokeNonce;
-        bool initialized;
-    }
-
-    mapping(address => Keys) private _keys;
-    mapping(address => address) private _ownerOfSigning;
-    mapping(address => address) private _ownerOfRevoke;
-
-    event KeysInitialized(address indexed owner, address indexed signingKey, address indexed revokeKey);
-    event SigningKeyRotated(address indexed owner, address indexed oldKey, address indexed newKey, uint256 revokeNonce);
-    event RevokeKeyRotated(address indexed owner, address indexed oldKey, address indexed newKey, uint256 revokeNonce);
-    event SigningNonceUsed(address indexed owner, uint256 nonce);
-    event RevokeNonceUsed(address indexed owner, uint256 nonce);
-
-    constructor(address admin) {
-        require(admin != address(0), "admin=0");
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(REGISTRY_ADMIN_ROLE, admin);
-    }
-
-    // -------- Views --------
-
-    function signingKeyOf(address owner) external view returns (address) {
-        Keys storage k = _keys[owner];
-        return k.initialized ? k.signingKey : address(0);
-    }
-
-    function revokeKeyOf(address owner) external view returns (address) {
-        Keys storage k = _keys[owner];
-        return k.initialized ? k.revokeKey : address(0);
-    }
-
-    function signingNonceOf(address owner) external view returns (uint256) {
-        return _keys[owner].signingNonce;
-    }
-
-    function revokeNonceOf(address owner) external view returns (uint256) {
-        return _keys[owner].revokeNonce;
-    }
-
-    function isInitialized(address owner) external view returns (bool) {
-        return _keys[owner].initialized;
-    }
-
-    function ownerOfSigningKey(address signingKey) external view returns (address) {
-        return _ownerOfSigning[signingKey];
-    }
-
-    function ownerOfRevokeKey(address revokeKey) external view returns (address) {
-        return _ownerOfRevoke[revokeKey];
-    }
-
-    // -------- Initialization --------
-
-    function initKeys(address signingKey, address revokeKey) internal {
-        require(signingKey != address(0), "signingKey=0");
-        require(revokeKey != address(0), "revokeKey=0");
-        require(signingKey != revokeKey, "keys-equal");
-        require(_ownerOfSigning[signingKey] == address(0), "signingKey-in-use");
-        require(_ownerOfRevoke[revokeKey] == address(0), "revokeKey-in-use");
-
-        Keys storage k = _keys[msg.sender];
-        require(!k.initialized, "already-initialized");
-
-        k.signingKey = signingKey;
-        k.revokeKey = revokeKey;
-        k.signingNonce = 0;
-        k.revokeNonce = 0;
-        k.initialized = true;
-
-        _ownerOfSigning[signingKey] = msg.sender;
-        _ownerOfRevoke[revokeKey] = msg.sender;
-
-        emit KeysInitialized(msg.sender, signingKey, revokeKey);
-    }
-
-    // -------- Rotations (B1+B) --------
-
-    function rotateSigning(address owner, address newSigning) external {
-        require(newSigning != address(0), "signingKey=0");
-        require(_ownerOfSigning[newSigning] == address(0), "signingKey-in-use");
-        Keys storage k = _keys[owner];
-        require(k.initialized, "not-initialized");
-        require(msg.sender == k.revokeKey, "not-revoke");
-        address old = k.signingKey;
-
-        delete _ownerOfSigning[old];
-        _ownerOfSigning[newSigning] = owner;
-        k.signingKey = newSigning;
-        k.revokeNonce++;
-        emit SigningKeyRotated(owner, old, newSigning, k.revokeNonce - 1);
-    }
-
-    function rotateRevoke(address owner, address newRevoke) external {
-        require(newRevoke != address(0), "revokeKey=0");
-        require(_ownerOfRevoke[newRevoke] == address(0), "revokeKey-in-use");
-        Keys storage k = _keys[owner];
-        require(k.initialized, "not-initialized");
-        require(msg.sender == k.revokeKey, "not-revoke");
-        address old = k.revokeKey;
-
-        delete _ownerOfRevoke[old];
-        _ownerOfRevoke[newRevoke] = owner;
-
-        k.revokeKey = newRevoke;
-        k.revokeNonce++;
-        emit RevokeKeyRotated(owner, old, newRevoke, k.revokeNonce - 1);
-    }
-
-    function initKeysFromAdmin(address owner, address signingKey, address revokeKey)
-        external
-        onlyRole(REGISTRY_ADMIN_ROLE)
-    {
-        require(owner != address(0), "owner=0");
-        require(signingKey != address(0), "signingKey=0");
-        require(revokeKey != address(0), "revokeKey=0");
-        require(signingKey != revokeKey, "keys-equal");
-        require(_ownerOfSigning[signingKey] == address(0), "signingKey-in-use");
-        require(_ownerOfRevoke[revokeKey] == address(0), "revokeKey-in-use");
-
-        Keys storage k = _keys[owner];
-        require(!k.initialized, "already-initialized");
-
-        k.signingKey = signingKey;
-        k.revokeKey = revokeKey;
-        k.signingNonce = 0;
-        k.revokeNonce = 0;
-        k.initialized = true;
-        _ownerOfSigning[signingKey] = owner;
-        _ownerOfRevoke[revokeKey] = owner;
-
-        emit KeysInitialized(owner, signingKey, revokeKey);
-    }
-
-    // -------- Admin helpers (called by token after signature verification) --------
-
-    function useSigningNonce(address owner, uint256 expected) external onlyRole(REGISTRY_ADMIN_ROLE) {
-        Keys storage k = _keys[owner];
-        require(k.signingNonce == expected, "bad-signing-nonce");
-        k.signingNonce++;
-        emit SigningNonceUsed(owner, expected);
-    }
-
-    function useRevokeNonce(address owner, uint256 expected) external onlyRole(REGISTRY_ADMIN_ROLE) {
-        Keys storage k = _keys[owner];
-        require(k.revokeNonce == expected, "bad-revoke-nonce");
-        k.revokeNonce++;
-        emit RevokeNonceUsed(owner, expected);
-    }
-
-    function setSigningKeyFromAdmin(address owner, address newKey) external onlyRole(REGISTRY_ADMIN_ROLE) {
-        require(newKey != address(0), "signingKey=0");
-        require(_ownerOfSigning[newKey] == address(0), "signingKey-in-use");
-        Keys storage k = _keys[owner];
-        require(k.initialized, "not-initialized");
-        address old = k.signingKey;
-
-        delete _ownerOfSigning[old];
-        _ownerOfSigning[newKey] = owner;
-
-        k.signingKey = newKey;
-        emit SigningKeyRotated(owner, old, newKey, k.revokeNonce);
-    }
-
-    function setRevokeKeyFromAdmin(address owner, address newKey) external onlyRole(REGISTRY_ADMIN_ROLE) {
-        require(newKey != address(0), "revokeKey=0");
-        require(_ownerOfRevoke[newKey] == address(0), "revokeKey-in-use");
-        Keys storage k = _keys[owner];
-        require(k.initialized, "not-initialized");
-        address old = k.revokeKey;
-
-        delete _ownerOfRevoke[old];
-        _ownerOfRevoke[newKey] = owner;
-
-        k.revokeKey = newKey;
-        emit RevokeKeyRotated(owner, old, newKey, k.revokeNonce);
-    }
-}
-
-/// ------------------------------------------------------------------------
-/// Inheritance Dollar Token
-/// ------------------------------------------------------------------------
 contract InheritanceDollar is ERC20Permit, AccessControl {
     error RecipientDead();
 
@@ -238,6 +30,13 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Liveness tracking: last year an owner signed/spent
     uint256 public constant MAX_SUPPLY = type(uint128).max;
 
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
+    // keep name "registry" for backward compatibility
+
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
+
+    // keep name "registry" for backward compatibility
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
     INDKeyRegistry public immutable registry;
 
     // --------------------------------------------------------------------
@@ -594,6 +393,15 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 /* compute actual receiver first */
                 super._transfer(recipient, heir, amount);
 
+                // forge-lint: disable-next-line(unsafe-typecast)
+                // safe: "HEIR" is 4 bytes <= 32 bytes
+
+                // forge-lint: disable-next-line(unsafe-typecast)
+
+                // safe: "HEIR" is 4 bytes <= 32 bytes
+
+                // safe: "HEIR" is 4 bytes <= 32 bytes
+                // forge-lint: disable-next-line(unsafe-typecast)
                 emit LotSwept(recipient, lotIndex, heir, amount, bytes32("HEIR"));
                 return;
             }
@@ -750,7 +558,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 nonce = registry.signingNonceOf(from);
 
         bytes32 structHash =
-            keccak256(abi.encode(TRANSFER_TYPEHASH, from, to, amount, waitSeconds, characteristic, nonce, deadline));
+        // forge-lint: disable-next-line(asm-keccak256)
+        keccak256(abi.encode(TRANSFER_TYPEHASH, from, to, amount, waitSeconds, characteristic, nonce, deadline));
 
         bytes32 digest = _hashTypedDataV4(structHash);
         address signer = digest.recover(signature);
@@ -913,6 +722,15 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         if (ty < 1970) ty = 1970;
         require(ty <= maxYear, "year-oob");
 
+        // forge-lint: disable-next-line(unsafe-typecast)
+        // safe: Gregorian year is bounded by conversion logic
+
+        // forge-lint: disable-next-line(unsafe-typecast)
+
+        // safe: Gregorian year is bounded by conversion logic
+
+        // safe: Gregorian year is bounded by conversion logic
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint16 targetYear = uint16(uint256(ty));
 
         uint256 tStart = Gregorian.yearStartTs(targetYear);
@@ -922,14 +740,19 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 shifted = tStart + offset;
         if (shifted >= tEnd) shifted = tEnd - 1;
 
+        // forge-lint: disable-next-line(unsafe-typecast) // shifted is derived from timestamp arithmetic bounded by MAX_WAIT_YEARS
         return uint64(shifted);
     }
 
-    function _shiftBackByPolicy(uint64 baseTs, uint256 deltaSeconds) internal view returns (uint64) {
+    function _shiftBackByPolicy(uint64 baseTs, uint256 deltaSeconds) internal pure returns (uint64) {
         // Policy:
         // - if deltaSeconds <= 365 days: pure seconds arithmetic
         // - if deltaSeconds >= 365 days + 1 sec: calendar-based (gregorian nYears) + remainder seconds
         if (deltaSeconds <= 365 days) {
+            // casting to uint64 is safe because:
+            // - baseTs is a block timestamp (< 2^64 for protocol lifetime)
+            // - deltaSeconds is bounded by MAX_WAIT_SECONDS (<= 50*366 days)
+            // forge-lint: disable-next-line(unsafe-typecast)
             return uint64(uint256(baseTs) - deltaSeconds);
         }
 
@@ -937,8 +760,11 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 rem = deltaSeconds % 365 days;
 
         // calendar-year shift preserves offset within year; remainder is seconds-based
+        // casting to int16 is safe because nYears <= MAX_WAIT_YEARS (50)
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint64 shifted = _shiftByYears(baseTs, -int16(int256(nYears)));
 
+        // forge-lint: disable-next-line(unsafe-typecast) // bounded timestamp delta <= MAX_WAIT_SECONDS
         return uint64(uint256(shifted) - rem);
     }
 
@@ -955,6 +781,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         if (nowYear < uint16(1970 + INACTIVITY_YEARS)) return false;
 
         // Calendar-year cutoff: "now minus INACTIVITY_YEARS" preserving offset within year
+        // forge-lint: disable-next-line(unsafe-typecast) // INACTIVITY_YEARS = 7 fits safely in int16
         uint64 cutoff = _shiftByYears(uint64(block.timestamp), -int16(INACTIVITY_YEARS));
 
         bool spendExpired = (spend == 0) ? true : spend < cutoff;
@@ -1041,6 +868,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
                 remaining -= amt;
                 lot.amount = 0;
             } else {
+                // forge-lint: disable-next-line(unsafe-typecast)
                 lot.amount = uint128(uint256(amt) - remaining);
                 remaining = 0;
             }
@@ -1050,9 +878,9 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // - avoid doing it for small arrays
         // - do it when head > 64 and head is past half of the array
         {
-            uint256 hGC = _head[owner];
-            uint256 lenGC = arr.length;
-            if (hGC > 64 && (hGC * 2) > lenGC) {
+            uint256 hGc = _head[owner];
+            uint256 lenGc = arr.length;
+            if (hGc > 64 && (hGc * 2) > lenGc) {
                 _compactLots(owner);
             }
         }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
-import "forge-std/Test.sol";
-import "forge-std/StdInvariant.sol";
+import {InheritanceDollar} from "../../contracts/InheritanceDollar.sol";
+import {Test} from "forge-std/Test.sol";
+import {StdInvariant} from "forge-std/StdInvariant.sol";
 import "../../contracts/InheritanceDollarCompat.sol";
 import "./Handler.t.sol";
 

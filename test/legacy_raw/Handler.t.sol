@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
-import "forge-std/Test.sol";
-import "../../contracts/InheritanceDollar.sol";
+import {InheritanceDollar} from "../../contracts/InheritanceDollarCompat.sol";
+import {Test} from "forge-std/Test.sol";
+import "../../contracts/InheritanceDollarCompat.sol";
 
 contract INDHandler is Test {
     InheritanceDollar public ind;
@@ -57,10 +57,14 @@ contract INDHandler is Test {
 
     // -------- actions (fuzzed) --------
 
+    // forge-lint: disable-next-line(mixed-case-function)
+
     function act_warp(uint256 secs) external {
         uint256 delta = bound(secs, 0, 3 days);
         vm.warp(block.timestamp + delta);
     }
+
+    // forge-lint: disable-next-line(mixed-case-function)
 
     function act_activate(uint256 ownerSeed) external {
         uint256 i = _boundIdx(ownerSeed, owners.length);

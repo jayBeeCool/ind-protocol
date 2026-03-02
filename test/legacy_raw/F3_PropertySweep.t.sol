@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
-import "forge-std/Test.sol";
-import "../../contracts/InheritanceDollar.sol";
+import {Test} from "forge-std/Test.sol";
+import "../../contracts/InheritanceDollarCompat.sol";
 
 contract F3_PropertySweep_Test is Test {
     INDKeyRegistry reg;
@@ -27,7 +26,7 @@ contract F3_PropertySweep_Test is Test {
         vm.stopPrank();
 
         vm.prank(alice);
-        ind.transfer(bob, 10 ether);
+        require(ind.transfer(bob, 10 ether));
 
         vm.warp(block.timestamp + ind.MIN_WAIT_SECONDS());
 
@@ -60,7 +59,7 @@ contract F3_PropertySweep_Test is Test {
         vm.stopPrank();
 
         vm.prank(alice);
-        ind.transfer(bob, 10 ether);
+        require(ind.transfer(bob, 10 ether));
 
         vm.warp(block.timestamp + ind.MIN_WAIT_SECONDS());
 
@@ -77,38 +76,38 @@ contract F3_PropertySweep_Test is Test {
 
     function test_property_burn_happens_only_when_fully_dead() public {
         address sOwner = address(0xAA01);
-        address sSK = address(0xAA02);
-        address sRK = address(0xAA03);
+        address sSk = address(0xAA02);
+        address sRk = address(0xAA03);
 
         address rOwner = address(0xBB01);
-        address rSK = address(0xBB02);
-        address rRK = address(0xBB03);
+        address rSk = address(0xBB02);
+        address rRk = address(0xBB03);
 
         // initialize keys
         vm.prank(sOwner);
-        ind.activateKeysAndMigrateWithHeir(sSK, sRK, address(0));
+        ind.activateKeysAndMigrateWithHeir(sSk, sRk, address(0));
 
         vm.prank(rOwner);
-        ind.activateKeysAndMigrateWithHeir(rSK, rRK, address(0));
+        ind.activateKeysAndMigrateWithHeir(rSk, rRk, address(0));
 
         // fund sender
         vm.prank(admin);
-        ind.mint(sSK, 20 ether);
+        ind.mint(sSk, 20 ether);
 
         vm.prank(admin);
-        ind.mint(rSK, 2 ether);
+        ind.mint(rSk, 2 ether);
 
         // touch outgoing so inactivity timer starts
-        vm.prank(sSK);
-        ind.transfer(address(0xD00D), 1);
+        vm.prank(sSk);
+        require(ind.transfer(address(0xD00D), 1));
 
-        vm.prank(rSK);
-        ind.transfer(address(0xD00D), 1);
+        vm.prank(rSk);
+        require(ind.transfer(address(0xD00D), 1));
 
         // create inheritance lot
 
-        vm.startPrank(sSK);
-        ind.transferWithInheritance(rSK, 10 ether, ind.MIN_WAIT_SECONDS(), bytes32("X"));
+        vm.startPrank(sSk);
+        ind.transferWithInheritance(rSk, 10 ether, ind.MIN_WAIT_SECONDS(), keccak256("X"));
         vm.stopPrank();
 
         // unlock + advance beyond DEAD_AFTER_SECONDS
@@ -117,7 +116,7 @@ contract F3_PropertySweep_Test is Test {
 
         uint256 supplyBefore = ind.totalSupply();
 
-        ind.sweepLot(rSK, ind.getLots(rSK).length - 1);
+        ind.sweepLot(rSk, ind.getLots(rSk).length - 1);
 
         uint256 supplyAfter = ind.totalSupply();
 
