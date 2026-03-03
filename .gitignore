@@ -19,3 +19,4 @@ gas_before.txt
 
 # local logs (never commit)
 .logs/
+.env

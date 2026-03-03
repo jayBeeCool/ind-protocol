@@ -1,121 +1,90 @@
-# IND Protocol Specification (Normative)
+# IND Protocol Specification (Draft)
 
 ## 1. Overview
 
-IND is a protocol for deferred value transfer with:
-- a mandatory minimum waiting period (24h), and
-- explicit revocation guarantees via a distinct authorization key.
+IND is a protocol for deferred value transfer with a mandatory waiting period
+and explicit revocation guarantees.
 
 The protocol is intended to be compatible with existing smart contracts and markets,
 while enforcing a minimum inheritance delay.
 
-This document specifies protocol rules and security constraints. Implementations may vary
-(ERC-20-like, escrow lots, account abstraction, etc.) as long as the normative rules hold.
+This document specifies protocol rules and security constraints. Implementations may
+vary (ERC-20-like, escrow lots, account abstraction, etc.) as long as Sections 3 and 4
+are satisfied.
 
 ## 2. Definitions
 
-- **Sender**: party initiating a transfer.
-- **Recipient**: party that will receive value after the waiting period.
-- **Creation time**: time a deferred transfer (lot) is created.
-- **Effective time / unlockTime**: time at which recipient may spend the value.
-- **minUnlockTime**: lower bound for unlockTime after creation.
+- **Sender**: the party initiating a transfer.
+- **Recipient**: the party that will receive value after the waiting period.
+- **Creation time**: the time at which a transfer is created.
+- **Effective time**: the time at which a transfer becomes executable/claimable.
 - **Minimum delay**: 86400 seconds (24 hours).
-- **All time values** are expressed in **seconds**.
-- **Owner**: logical account identity.
-- **signingKey (hot)**: authorizes transfers/spending.
-- **revokeKey (cold)**: authorizes reduce/revoke, key rotation, critical controls.
+- All time values are expressed in **seconds**.
 
-## 3. Enforcement model (DECLARATION for this repository)
+## 3. Time rules (normative)
 
-This repository implementation uses an **on-chain enforced escrow/lock model** based on
-per-recipient lots: incoming value is recorded into lots with an `unlockTime` and is not
-spendable before unlock. This guarantees the minimum waiting period on-chain.
+- A transfer MUST define an effective time that is at least 86400 seconds in the future.
+- After creation, the sender MAY reduce the effective time, but MUST NOT reduce it below
+  86400 seconds from the current time.
+- The effective time MUST NOT be increased after creation.
 
-## 4. Normative Rules (R1..R28)
+## 4. Revocation (normative)
 
-### Time & Unlock
+- A transfer MAY be revoked by the sender before the effective time.
+- Revocation authorization MUST use a key or authorization mechanism that is distinct
+  from normal signing for transfer creation.
+- After the effective time, revocation MUST be impossible.
 
-**R1 (Minimum delay).** Every deferred transfer MUST define `unlockTime >= now + 86400`.
+## 5. Recipient constraints and enforcement model
 
-**R2 (No early spend).** Before `unlockTime`, the recipient MUST NOT be able to spend the value.
+### 5.1 Two possible enforcement models
 
-**R3 (Reduction allowed, bounded).** Before `unlockTime`, the sender MAY reduce `unlockTime`,
-but MUST NOT reduce it below `minUnlockTime`.
+If the implementation holds funds in escrow (or otherwise prevents early availability),
+then the waiting period is enforced on-chain.
 
-**R4 (No increase).** After creation, `unlockTime` MUST NOT be increased.
+If the implementation exposes a freely transferable asset (e.g., a standard ERC-20),
+then "recipient waiting period" is a protocol-level rule that may require integrator
+compliance and cannot be universally enforced on-chain.
 
-**R5 (After unlock, immutable).** After `unlockTime`, sender MUST NOT reduce or revoke.
+Implementations MUST state which model they implement.
 
-### Revocation
+### 5.2 This repository model (DECLARATION)
 
-**R6 (Revocation allowed only pre-unlock).** Before `unlockTime`, sender MAY revoke and recover value.
+**This implementation uses an on-chain enforced escrow model based on per-recipient lots.**
+Funds received are recorded into lots with an `unlockTime` and are not spendable before
+unlock. This guarantees the minimum waiting period on-chain.
 
-**R7 (Revocation impossible post-unlock).** After `unlockTime`, revocation MUST be impossible.
+## 6. Key separation (normative extension)
 
-**R8 (Distinct authorization).** Revoke/reduce authorization MUST use a distinct key/mechanism
-from normal transfer signing (operationally: `revokeKey`).
+To satisfy Section 4, implementations SHOULD provide distinct authorizers for:
+- transfer creation / normal spending (e.g., **signing key**)
+- revocation actions (e.g., **revoke key**)
 
-### Keys & Ownership
+If a registry is used to bind an "owner identity" to its keys, the implementation MUST
+treat key roles distinctly for authorization checks.
 
-**R9 (Key separation).** Owner MUST have distinct `signingKey` and `revokeKey` (MUST NOT be equal).
+## 7. Lots and spendability (implementation notes, consistent with Sections 3–4)
 
-**R10 (Uniqueness).** A signingKey/revokeKey MUST NOT be reused across owners.
+- Incoming value to a recipient is tracked as one or more **lots**.
+- Each lot has at minimum: `amountRemaining`, `unlockTime` (and optionally `minUnlockTime`,
+  `characteristic`, `lotIndex`).
+- A transfer that creates a lot MUST set `unlockTime >= now + 86400`.
+- A recipient MUST NOT be able to spend more than the sum of unlocked lot amounts.
+  Attempting to spend locked value MUST revert.
 
-**R11 (SigningKey scope).** signingKey authorizes transfers/spending only. It MUST NOT authorize
-revoke/reduce/key-rotation.
+## 8. Liveness and sweeping (implementation notes)
 
-**R12 (RevokeKey scope).** revokeKey authorizes revoke/reduce/default-heir updates/key rotations.
+Some IND deployments may define a liveness rule for recipients and a corresponding
+"sweep" operation (e.g., burn, refund to sender, or redirect to heir) when the recipient
+is considered inactive/dead.
 
-**R13 (Activation).** Owner MAY activate keys once. Activation MUST initialize registry bindings.
+If a sweep operation exists:
+- It MUST have a well-defined eligibility rule (e.g., “recipient is DEAD”).
+- Sweeping an already-empty lot MUST revert with a deterministic error (e.g., `empty-lot`)
+  rather than underflow/panic.
 
-**R14 (Migration on activation).** On activation, any balance on owner MUST be migrated to signingKey
-and made immediately spendable.
+## 9. Scope
 
-### Recipient handling & redirection
-
-**R15 (Owner address non-trapping).** If tokens are sent/minted to an initialized owner address,
-implementation MUST redirect to that owner’s signingKey.
-
-**R16 (SigningKey receives normally).** If tokens are sent to a signingKey, they MUST land there.
-
-### Lots & spendability
-
-**R17 (Spendable vs total).** Implementation MUST define spendable balance distinct from total when locked.
-
-**R18 (Consumption).** Only unlocked lots MUST be consumable; locked lots MUST remain locked.
-
-### Liveness / Dead
-
-**R19 (Liveness source).** Alive/Dead MUST be based only on signed outgoing actions.
-
-**R20 (Never-seen non-strict).** Never-seen addresses MUST NOT be considered dead under non-strict checks.
-
-**R21 (Strict mode).** Strict checks MAY treat never-seen as dead, only where explicitly intended.
-
-### Sweep
-
-**R22 (Sweep eligibility).** Sweep MUST only be allowed when recipient owner is dead per intended rule.
-
-**R23 (Sweep priority).** Sweep MUST resolve in order:
-1) refund to sender (or sender signingKey) if sender alive,
-2) else default heir if configured and alive,
-3) else burn.
-
-**R24 (No double-sweep).** Sweeping an already-empty lot MUST revert deterministically (e.g. "empty-lot").
-
-### Gregorian / Calendar policy (critical)
-
-**R25 (Seconds vs calendar trigger).**
-If a time delta is **<= 365 days**, it MUST be treated as pure seconds arithmetic.
-If a time delta is **>= 365 days + 1 second**, it MUST be treated as calendar-based (Gregorian year shifting)
-with remainder seconds.
-
-**R26 (Calendar shift semantics).** Calendar shifting MUST preserve offset within UTC year when possible,
-clamping safely if target year is shorter (leap/non-leap).
-
-**R27 (No 365-flattening).** Implementations MUST NOT flatten years to 365 days when R25 triggers calendar mode.
-
-### Scope
-
-**R28 (Compatibility freedom).** Implementation details (ERC-20/EIP-712/EIP-4337/etc.) are allowed
-as long as rules R1..R27 are satisfied.
+This specification defines protocol rules and security constraints.
+Implementation details (ERC-20, EIP-712, EIP-4337, etc.) are allowed as long as
+Sections 3 and 4 are satisfied.

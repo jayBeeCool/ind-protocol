@@ -9,6 +9,12 @@ import {Gregorian} from "./lib/Gregorian.sol";
 import {INDKeyRegistry} from "./INDKeyRegistry.sol";
 
 contract InheritanceDollar is ERC20Permit, AccessControl {
+    function _revertOwnerDisabled() private pure {
+        assembly {
+            mstore(0x00, 0xf28dceb300000000000000000000000000000000000000000000000000000000)
+            revert(0x00, 0x04)
+        }
+    }
     error RecipientDead();
 
     using ECDSA for bytes32;
@@ -59,7 +65,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     mapping(address => AvgState) private _avg;
 
     event DefaultHeirSet(address indexed owner, address indexed heir);
-    event SpendTouched(address indexed owner, uint16 year);
     event LotSwept(
         address indexed recipient, uint256 indexed lotIndex, address indexed to, uint256 amount, bytes32 action
     );
@@ -157,6 +162,23 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     // Views
     // --------------------------------------------------------------------
 
+    /// @notice Standard getter for a single lot (tuple-return, test/audit friendly).
+    function lotOf(address recipient, uint256 lotIndex)
+        external
+        view
+        returns (
+            address senderOwner,
+            uint256 amountRemaining,
+            uint64 unlockTime,
+            uint64 minUnlockTime,
+            bytes32 characteristic
+        )
+    {
+        require(lotIndex < _lots[recipient].length, "lotIndex-oob");
+        Lot storage lot = _lots[recipient][lotIndex];
+        return (lot.senderOwner, lot.amount, lot.unlockTime, lot.minUnlockTime, lot.characteristic);
+    }
+
     function getLots(address account) external view returns (Lot[] memory) {
         return _lots[account];
     }
@@ -201,7 +223,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         public
         override
     {
-        require(!registry.isInitialized(owner), "owner-disabled");
+        if (registry.isInitialized(owner)) _revertOwnerDisabled();
         super.permit(owner, spender, value, deadline, v, r, s);
     }
 
@@ -213,7 +235,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         address owner = _logicalOwnerOf(msg.sender);
         if (registry.ownerOfSigningKey(msg.sender) != address(0)) _touchSignedOut(owner);
 
-        require(!registry.isInitialized(msg.sender), "owner-disabled");
+        if (registry.isInitialized(msg.sender)) _revertOwnerDisabled();
         _touchSpend(msg.sender);
         _transferWithInheritance(msg.sender, to, amount, MIN_WAIT_SECONDS, bytes32(0));
 
@@ -224,13 +246,13 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         external
         returns (bool)
     {
-        require(!registry.isInitialized(msg.sender), "owner-disabled");
+        if (registry.isInitialized(msg.sender)) _revertOwnerDisabled();
         _transferWithInheritance(msg.sender, to, amount, waitSeconds, characteristic);
         return true;
     }
 
     function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
-        require(!registry.isInitialized(from), "owner-disabled");
+        if (registry.isInitialized(from)) _revertOwnerDisabled();
         uint256 allowanceCur = allowance(from, msg.sender);
         require(allowanceCur >= amount, "insufficient allowance");
         unchecked {
@@ -310,7 +332,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function approve(address spender, uint256 amount) public override returns (bool) {
-        require(!registry.isInitialized(msg.sender), "owner-disabled");
+        if (registry.isInitialized(msg.sender)) _revertOwnerDisabled();
         return super.approve(spender, amount);
     }
 
@@ -370,7 +392,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         }
 
         // both dead -> defaultHeir S1 (last resort) then burn
-        // both dead -> defaultHeir S1 (last resort) then burn
         address heir = _defaultHeir[recipOwner];
         if (heir != address(0)) {
             address heirOwner = _logicalOwnerOf(heir);
@@ -405,6 +426,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function reduceUnlockTime(address recipient, uint256 lotIndex, uint64 newUnlockTime) external {
+        require(lotIndex < _lots[recipient].length, "lotIndex-oob");
+
         Lot storage lot = _lots[recipient][lotIndex];
         require(lot.amount != 0, "empty-lot");
 
@@ -427,6 +450,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function revoke(address recipient, uint256 lotIndex) external {
+        require(lotIndex < _lots[recipient].length, "lotIndex-oob");
+
         _touchSpend(msg.sender);
         Lot storage lot = _lots[recipient][lotIndex];
         uint256 amount = uint256(lot.amount);
@@ -530,8 +555,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 deadline,
         bytes calldata signature
     ) external {
-        require(!registry.isInitialized(from), "owner-disabled");
-        require(!registry.isInitialized(from), "owner-disabled");
+        if (registry.isInitialized(from)) _revertOwnerDisabled();
+        if (registry.isInitialized(from)) _revertOwnerDisabled();
         require(block.timestamp <= deadline, "expired");
         require(waitSeconds >= MIN_WAIT_SECONDS, "wait-too-short");
 
@@ -567,8 +592,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         address owner = _logicalOwnerOf(actor);
 
         _lastSignedOutTs[owner] = uint64(block.timestamp);
-        uint16 y = uint256(block.timestamp).yearOf();
-        emit SpendTouched(owner, y);
     }
 
     function _touchRenew(address actor) internal {
@@ -577,9 +600,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function keepAlive() external {
-        // renew tracked on logical owner (AND-liveness)
-        address owner = _logicalOwnerOf(msg.sender);
-        _touchRenew(owner);
+        _touchRenew(msg.sender);
     }
 
     function _avgAccumulate(address a) internal {
@@ -800,7 +821,6 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         // block transfers to dead recipients (recipient is the heir of this transfer)
         address recipOwner = _logicalOwnerOf(recipient);
         if (_isDead(recipOwner)) revert RecipientDead();
-
         recipient = _resolveRecipient(recipient);
 
         // Resolve logical owner (if sender is signingKey)
