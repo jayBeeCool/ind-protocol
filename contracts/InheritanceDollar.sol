@@ -9,6 +9,12 @@ import {Gregorian} from "./lib/Gregorian.sol";
 import {INDKeyRegistry} from "./INDKeyRegistry.sol";
 
 contract InheritanceDollar is ERC20Permit, AccessControl {
+    function _revertOwnerDisabled() private pure {
+        assembly {
+            mstore(0x00, 0xf28dceb300000000000000000000000000000000000000000000000000000000)
+            revert(0x00, 0x04)
+        }
+    }
     error RecipientDead();
 
     using ECDSA for bytes32;
@@ -217,7 +223,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         public
         override
     {
-        require(!registry.isInitialized(owner), "owner-disabled");
+        if (registry.isInitialized(owner)) _revertOwnerDisabled();
         super.permit(owner, spender, value, deadline, v, r, s);
     }
 
@@ -229,7 +235,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         address owner = _logicalOwnerOf(msg.sender);
         if (registry.ownerOfSigningKey(msg.sender) != address(0)) _touchSignedOut(owner);
 
-        require(!registry.isInitialized(msg.sender), "owner-disabled");
+        if (registry.isInitialized(msg.sender)) _revertOwnerDisabled();
         _touchSpend(msg.sender);
         _transferWithInheritance(msg.sender, to, amount, MIN_WAIT_SECONDS, bytes32(0));
 
@@ -240,13 +246,13 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         external
         returns (bool)
     {
-        require(!registry.isInitialized(msg.sender), "owner-disabled");
+        if (registry.isInitialized(msg.sender)) _revertOwnerDisabled();
         _transferWithInheritance(msg.sender, to, amount, waitSeconds, characteristic);
         return true;
     }
 
     function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
-        require(!registry.isInitialized(from), "owner-disabled");
+        if (registry.isInitialized(from)) _revertOwnerDisabled();
         uint256 allowanceCur = allowance(from, msg.sender);
         require(allowanceCur >= amount, "insufficient allowance");
         unchecked {
@@ -326,7 +332,7 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
     }
 
     function approve(address spender, uint256 amount) public override returns (bool) {
-        require(!registry.isInitialized(msg.sender), "owner-disabled");
+        if (registry.isInitialized(msg.sender)) _revertOwnerDisabled();
         return super.approve(spender, amount);
     }
 
@@ -549,8 +555,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint256 deadline,
         bytes calldata signature
     ) external {
-        require(!registry.isInitialized(from), "owner-disabled");
-        require(!registry.isInitialized(from), "owner-disabled");
+        if (registry.isInitialized(from)) _revertOwnerDisabled();
+        if (registry.isInitialized(from)) _revertOwnerDisabled();
         require(block.timestamp <= deadline, "expired");
         require(waitSeconds >= MIN_WAIT_SECONDS, "wait-too-short");
 
