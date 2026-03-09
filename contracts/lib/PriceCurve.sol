@@ -40,8 +40,8 @@ library PriceCurve {
         return Math.mulDiv(K_WEI_PER_TOKEN, fWad, WAD);
     }
 
-    /// Costo totale approssimato con midpoint rule:
-    /// cost ≈ price(currentSupply + amount/2) * amount
+    /// Costo totale approssimato con trapezoidal rule:
+    /// cost ≈ ((price(S0) + price(S1)) / 2) * amount
     ///
     /// ritorna wei ETH.
     function costToMint(uint256 currentSupplyWei, uint256 amountWei) internal pure returns (uint256) {
@@ -51,12 +51,21 @@ library PriceCurve {
         uint256 endSupplyWei = currentSupplyWei + amountWei;
         if (endSupplyWei >= MAX_SUPPLY_WEI) revert EndSupplyAtOrAboveMax();
 
-        uint256 midSupplyWei = currentSupplyWei + amountWei / 2;
-        uint256 priceWeiPerToken = priceAtSupply(midSupplyWei);
+        uint256 p0 = priceAtSupply(currentSupplyWei);
+        uint256 p1 = priceAtSupply(endSupplyWei);
+
+        uint256 avgPriceWeiPerToken = (p0 + p1) / 2;
 
         // price is weiETH per 1 IND
         // amountWei is weiIND
-        return Math.mulDiv(priceWeiPerToken, amountWei, WAD);
+        uint256 cost = Math.mulDiv(avgPriceWeiPerToken, amountWei, WAD);
+
+        // per amount positivo, il costo non deve collassare a zero per effetto dell'arrotondamento
+        if (cost == 0) {
+            return 1;
+        }
+
+        return cost;
     }
 
     /// Quanti IND (wei-token) puoi comprare con `ethInWei`,
