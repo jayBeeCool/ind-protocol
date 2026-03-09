@@ -5,71 +5,82 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./lib/PriceCurve.sol";
 
-interface IINDMintable {
+interface IINDSupply {
     function totalSupply() external view returns (uint256);
-    function mintWithMantissa(
-        address to,
-        uint256 amount,
-        uint64 mantissaSeconds,
-        bytes32 characteristic
-    ) external returns (bool);
 }
 
 contract INDSale is AccessControl, ReentrancyGuard {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    uint64 public constant MIN_MANTISSA_SECONDS = 1 days;
-
     // Burn sink irreversibile in pratica
     address payable public constant ETH_BURN_SINK =
         payable(0x000000000000000000000000000000000000dEaD);
 
-    IINDMintable public immutable ind;
+    // Compat fallback only: if the token still exposes only mintWithMantissa(...)
+    // the sale can still mint using a neutral fixed payload.
+    uint64 public constant COMPAT_WAIT_SECONDS = 1 days;
+    bytes32 public constant COMPAT_CHARACTERISTIC = bytes32(0);
+
+    IINDSupply public immutable ind;
 
     event Bought(
-        address indexed buyer,
+        address indexed payer,
+        address indexed refundTo,
         address indexed recipient,
         uint256 ethIn,
         uint256 ethUsed,
         uint256 ethRefunded,
-        uint256 indOut,
-        uint64 mantissaSeconds,
-        bytes32 indexed characteristic
+        uint256 indOut
     );
 
     error ZeroValue();
     error ZeroRecipient();
+    error ZeroRefundTo();
     error SlippageTooHigh();
     error ZeroOutput();
     error BurnFailed();
     error RefundFailed();
-    error InvalidMantissa();
+    error MintFailed();
 
-    constructor(address admin, IINDMintable indToken) {
+    constructor(address admin, address indToken) {
         require(admin != address(0), "admin=0");
-        require(address(indToken) != address(0), "ind=0");
+        require(indToken != address(0), "ind=0");
 
-        ind = indToken;
+        ind = IINDSupply(indToken);
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
     }
 
-    /// Buy per se stessi, lock minimo 1 giorno.
+    /// Buy per se stessi: l'eventuale resto ETH torna al chiamante.
     function buy(uint256 minOutWei) external payable returns (uint256 outWei) {
-        return buyTo(msg.sender, minOutWei, MIN_MANTISSA_SECONDS, bytes32(0));
+        return _purchaseFor(msg.sender, msg.sender, minOutWei);
     }
 
-    /// Buy verso recipient con characteristic custom, ma mantissa sempre >= 1 giorno.
-    function buyTo(
-        address recipient,
-        uint256 minOutWei,
-        uint64 mantissaSeconds,
-        bytes32 characteristic
-    ) public payable nonReentrant returns (uint256 outWei) {
+    /// Buy verso un recipient specifico: l'eventuale resto ETH torna al chiamante.
+    function buyTo(address recipient, uint256 minOutWei) external payable returns (uint256 outWei) {
+        return _purchaseFor(recipient, msg.sender, minOutWei);
+    }
+
+    /// Variante generica utile per receiver/proxy di deposito:
+    /// - recipient = chi riceve gli IND
+    /// - refundTo  = chi riceve il resto ETH
+    function purchaseFor(address recipient, address refundTo, uint256 minOutWei)
+        external
+        payable
+        returns (uint256 outWei)
+    {
+        return _purchaseFor(recipient, refundTo, minOutWei);
+    }
+
+    function _purchaseFor(address recipient, address refundTo, uint256 minOutWei)
+        internal
+        nonReentrant
+        returns (uint256 outWei)
+    {
         if (msg.value == 0) revert ZeroValue();
         if (recipient == address(0)) revert ZeroRecipient();
-        if (mantissaSeconds < MIN_MANTISSA_SECONDS) revert InvalidMantissa();
+        if (refundTo == address(0)) revert ZeroRefundTo();
 
         uint256 currentSupply = ind.totalSupply();
 
@@ -80,30 +91,46 @@ contract INDSale is AccessControl, ReentrancyGuard {
         uint256 ethUsed = PriceCurve.costToMint(currentSupply, outWei);
         uint256 refund = msg.value - ethUsed;
 
-        // mint IND locked
-        bool ok = ind.mintWithMantissa(recipient, outWei, mantissaSeconds, characteristic);
-        require(ok, "mint-failed");
+        _mintIND(recipient, outWei);
 
-        // burn ETH used
         (bool burnOk, ) = ETH_BURN_SINK.call{value: ethUsed}("");
         if (!burnOk) revert BurnFailed();
 
-        // refund excess ETH
         if (refund > 0) {
-            (bool refundOk, ) = payable(msg.sender).call{value: refund}("");
+            (bool refundOk, ) = payable(refundTo).call{value: refund}("");
             if (!refundOk) revert RefundFailed();
         }
 
-        emit Bought(
-            msg.sender,
-            recipient,
-            msg.value,
-            ethUsed,
-            refund,
-            outWei,
-            mantissaSeconds,
-            characteristic
-        );
+        emit Bought(msg.sender, refundTo, recipient, msg.value, ethUsed, refund, outWei);
+    }
+
+    function _mintIND(address recipient, uint256 amountWei) internal {
+        // Preferred modern path: mint(address,uint256)
+        {
+            (bool ok, bytes memory ret) =
+                address(ind).call(abi.encodeWithSignature("mint(address,uint256)", recipient, amountWei));
+            if (ok) {
+                if (ret.length == 0 || abi.decode(ret, (bool))) return;
+            }
+        }
+
+        // Backward-compatible path: mintWithMantissa(address,uint256,uint64,bytes32)
+        {
+            (bool ok, bytes memory ret) = address(ind).call(
+                abi.encodeWithSignature(
+                    "mintWithMantissa(address,uint256,uint64,bytes32)",
+                    recipient,
+                    amountWei,
+                    COMPAT_WAIT_SECONDS,
+                    COMPAT_CHARACTERISTIC
+                )
+            );
+            if (ok) {
+                if (ret.length == 0 || abi.decode(ret, (bool))) return;
+            }
+        }
+
+        revert MintFailed();
     }
 
     receive() external payable {
