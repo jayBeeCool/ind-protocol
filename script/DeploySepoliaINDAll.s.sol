@@ -9,6 +9,7 @@ import "../contracts/INDDepositReceiver.sol";
 
 contract DeploySepoliaINDAll is Script {
     function run() external {
+        uint256 pk = vm.envUint("PRIVATE_KEY");
         address admin = vm.addr(pk);
         address recipient = vm.envAddress("RECIPIENT_ADDRESS");
 
