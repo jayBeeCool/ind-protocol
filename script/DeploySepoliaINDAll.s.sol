@@ -9,11 +9,10 @@ import "../contracts/INDDepositReceiver.sol";
 
 contract DeploySepoliaINDAll is Script {
     function run() external {
-        uint256 pk = vm.envUint("PRIVATE_KEY");
         address admin = vm.addr(pk);
         address recipient = vm.envAddress("RECIPIENT_ADDRESS");
 
-        vm.startBroadcast(pk);
+        vm.startBroadcast();
 
         INDKeyRegistry registry = new INDKeyRegistry(admin);
         InheritanceDollar ind = new InheritanceDollar(admin, registry);
