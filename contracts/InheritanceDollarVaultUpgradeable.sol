@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import "./interfaces/IINDKeyRegistryLite.sol";
+import "./lib/Gregorian.sol";
 
 contract InheritanceDollarVaultUpgradeable is
     Initializable,
@@ -15,12 +16,18 @@ contract InheritanceDollarVaultUpgradeable is
     IERC20,
     IERC20Metadata
 {
+    using Gregorian for uint256;
+
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     uint64 public constant MIN_INHERITANCE_WAIT = 1 days;
-    uint64 public constant MAX_INHERITANCE_WAIT = uint64(50 * 365 days);
-    uint64 public constant DEAD_AFTER = uint64(7 * 365 days);
+    uint16 public constant INACTIVITY_YEARS = 7;
+    uint16 public constant MAX_WAIT_YEARS = 50;
+
+    // upper bounds / compatibility guards, NOT final semantic source of truth
+    uint64 public constant MAX_INHERITANCE_WAIT = uint64(50 * 366 days);
+    uint64 public constant DEAD_AFTER = uint64(7 * 366 days);
 
     struct Lot {
         uint256 amount;
@@ -41,7 +48,12 @@ contract InheritanceDollarVaultUpgradeable is
     mapping(address => Lot[]) private _lots;
     mapping(address => uint256) private _head;
     mapping(address => mapping(address => uint256)) private _allowances;
-    mapping(address => uint64) private _lastInteraction;
+
+    // Liveness (AND semantics)
+    mapping(address => uint64) private _lastSignedOutTs;
+    mapping(address => uint64) private _lastRenewTs;
+
+    mapping(address => address) private _defaultHeir;
 
     event TransferWithInheritance(
         address indexed sender,
@@ -53,6 +65,10 @@ contract InheritanceDollarVaultUpgradeable is
         uint256 lotIndex
     );
 
+    event LotSwept(address indexed recipient, uint256 indexed lotIndex, address indexed to, uint256 amount);
+    event DefaultHeirSet(address indexed owner, address indexed heir);
+    event AutoSwept(address indexed owner, address indexed to, uint256 amount);
+
     error ZeroAddress();
     error ZeroAmount();
     error MaxSupplyExceeded();
@@ -61,6 +77,8 @@ contract InheritanceDollarVaultUpgradeable is
     error InsufficientAllowance();
     error InheritanceWaitTooShort();
     error InheritanceWaitTooLong();
+    error RecipientDead();
+    error NotRevoke();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -82,7 +100,7 @@ contract InheritanceDollarVaultUpgradeable is
         _grantRole(UPGRADER_ROLE, admin);
         _grantRole(MINTER_ROLE, admin);
 
-        _touchInteraction(admin);
+        _touchActive(admin);
     }
 
     function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
@@ -118,14 +136,40 @@ contract InheritanceDollarVaultUpgradeable is
         return _allowances[owner][spender];
     }
 
+    // Compatibility getter used by older tests: returns the max of liveness timestamps
     function lastInteractionOf(address account) external view returns (uint64) {
-        return _lastInteraction[account];
+        address ownerLogical = _logicalOwnerOf(account);
+        uint64 a = _lastSignedOutTs[ownerLogical];
+        uint64 b = _lastRenewTs[ownerLogical];
+        return a >= b ? a : b;
+    }
+
+    function lastSignedOutOf(address account) external view returns (uint64) {
+        return _lastSignedOutTs[_logicalOwnerOf(account)];
+    }
+
+    function lastRenewOf(address account) external view returns (uint64) {
+        return _lastRenewTs[_logicalOwnerOf(account)];
+    }
+
+    function defaultHeirOf(address owner) external view returns (address) {
+        return _defaultHeir[owner];
+    }
+
+    // exact gregorian max wait from "now"
+    function maxInheritanceWaitNow() external view returns (uint64) {
+        uint64 nowTs = uint64(block.timestamp);
+        uint64 maxUnlock = _shiftByYears(nowTs, MAX_WAIT_YEARS);
+        return maxUnlock - nowTs;
+    }
+
+    // exact gregorian death threshold for this owner
+    function deathTimestampOf(address account) external view returns (uint64) {
+        return _deathTimestampOf(_logicalOwnerOf(account));
     }
 
     function isDead(address account) public view returns (bool) {
-        uint64 li = _lastInteraction[account];
-        if (li == 0) return false;
-        return uint64(block.timestamp) > li + DEAD_AFTER;
+        return _isDead(_logicalOwnerOf(account));
     }
 
     function headOf(address user) external view returns (uint256) {
@@ -172,12 +216,42 @@ contract InheritanceDollarVaultUpgradeable is
         return _unprotectedBalances[user] + protectedBalanceOf(user);
     }
 
+    function keepAlive() external returns (bool) {
+        _touchRenew(msg.sender);
+        return true;
+    }
+
+    function renewLiveness() external returns (bool) {
+        _touchRenew(msg.sender);
+        return true;
+    }
+
+    function setDefaultHeir(address heir) external returns (bool) {
+        if (registry.ownerOfSigningKey(msg.sender) != address(0)) _revertOwnerDisabled();
+        if (registry.isInitialized(msg.sender)) _revertOwnerDisabled();
+
+        _defaultHeir[msg.sender] = heir;
+
+        _touchRenew(msg.sender);
+        emit DefaultHeirSet(msg.sender, heir);
+        return true;
+    }
+
+    function revokeSetDefaultHeir(address owner, address newHeir) external returns (bool) {
+        address rk = registry.revokeKeyOf(owner);
+        if (rk == address(0) || msg.sender != rk) revert NotRevoke();
+
+        _defaultHeir[owner] = newHeir;
+        emit DefaultHeirSet(owner, newHeir);
+        return true;
+    }
+
     function approve(address spender, uint256 amount) external override returns (bool) {
         address owner = msg.sender;
         if (registry.isInitialized(owner)) _revertOwnerDisabled();
 
         _allowances[owner][spender] = amount;
-        _touchInteraction(owner);
+        _touchRenew(owner);
         emit Approval(owner, spender, amount);
         return true;
     }
@@ -185,15 +259,28 @@ contract InheritanceDollarVaultUpgradeable is
     function transfer(address to, uint256 amount) external override returns (bool) {
         address sender = msg.sender;
         if (registry.isInitialized(sender)) _revertOwnerDisabled();
+        if (to == address(0)) revert ZeroAddress();
 
-        address resolved = _resolveRecipient(to);
-        _transferUnprotected(sender, resolved, amount);
-        _touchInteraction(sender);
+        address rawTarget = _resolveRecipientRaw(to);
+        address targetOwner = _logicalOwnerOf(rawTarget);
+
+        _autoSweepIfDead(targetOwner);
+
+        // invio a morto: i fondi vecchi vengono auto-sweepati,
+        // il nuovo invio NON entra e resta al mittente
+        if (_isDead(targetOwner)) {
+            _touchActive(sender);
+            return true;
+        }
+
+        _transferUnprotected(sender, rawTarget, amount);
+        _touchActive(sender);
         return true;
     }
 
     function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
         if (registry.isInitialized(from)) _revertOwnerDisabled();
+        if (to == address(0)) revert ZeroAddress();
 
         uint256 a = _allowances[from][msg.sender];
         if (a < amount) revert InsufficientAllowance();
@@ -203,9 +290,20 @@ contract InheritanceDollarVaultUpgradeable is
         }
         emit Approval(from, msg.sender, _allowances[from][msg.sender]);
 
-        address resolved = _resolveRecipient(to);
-        _transferUnprotected(from, resolved, amount);
-        _touchInteraction(from);
+        address rawTarget = _resolveRecipientRaw(to);
+        address targetOwner = _logicalOwnerOf(rawTarget);
+
+        _autoSweepIfDead(targetOwner);
+
+        // invio a morto: i fondi vecchi vengono auto-sweepati,
+        // il nuovo invio NON entra e resta al mittente
+        if (_isDead(targetOwner)) {
+            _touchActive(from);
+            return true;
+        }
+
+        _transferUnprotected(from, rawTarget, amount);
+        _touchActive(from);
         return true;
     }
 
@@ -214,7 +312,7 @@ contract InheritanceDollarVaultUpgradeable is
         if (amount == 0) revert ZeroAmount();
         if (_totalSupplyCustom + amount > maxSupply) revert MaxSupplyExceeded();
 
-        address resolved = _resolveRecipient(to);
+        address resolved = _resolveRecipientRaw(to);
 
         _totalSupplyCustom += amount;
         _unprotectedBalances[resolved] += amount;
@@ -235,7 +333,7 @@ contract InheritanceDollarVaultUpgradeable is
             Lot({amount: amount, unlockTime: uint64(block.timestamp), minUnlockTime: uint64(block.timestamp)})
         );
 
-        _touchInteraction(sender);
+        _touchActive(sender);
         return true;
     }
 
@@ -245,10 +343,11 @@ contract InheritanceDollarVaultUpgradeable is
         address sender = msg.sender;
         if (registry.isInitialized(sender)) _revertOwnerDisabled();
 
+        _autoSweepIfDead(_logicalOwnerOf(sender));
         _consumeSpendableLots(sender, amount);
         _unprotectedBalances[sender] += amount;
 
-        _touchInteraction(sender);
+        _touchActive(sender);
         return true;
     }
 
@@ -257,24 +356,154 @@ contract InheritanceDollarVaultUpgradeable is
         returns (bool)
     {
         if (waitSeconds < MIN_INHERITANCE_WAIT) revert InheritanceWaitTooShort();
-        if (waitSeconds > MAX_INHERITANCE_WAIT) revert InheritanceWaitTooLong();
+
+        uint64 nowTs = uint64(block.timestamp);
+        uint64 maxUnlock = _shiftByYears(nowTs, MAX_WAIT_YEARS);
+        if (nowTs + waitSeconds > maxUnlock) revert InheritanceWaitTooLong();
 
         address sender = msg.sender;
         if (registry.isInitialized(sender)) _revertOwnerDisabled();
+        if (to == address(0)) revert ZeroAddress();
 
-        address resolved = _resolveRecipient(to);
+        address rawTarget = _resolveRecipientRaw(to);
+        address targetOwner = _logicalOwnerOf(rawTarget);
+
+        _autoSweepIfDead(targetOwner);
+        _autoSweepIfDead(_logicalOwnerOf(sender));
         _consumeSpendableLots(sender, amount);
-        _touchInteraction(sender);
+        _touchActive(sender);
 
-        uint64 unlockTime = uint64(block.timestamp) + waitSeconds;
+        // invio a morto: il nuovo valore torna subito spendibile al mittente
+        if (_isDead(targetOwner)) {
+            _lots[sender].push(Lot({amount: amount, unlockTime: nowTs, minUnlockTime: nowTs}));
+            return true;
+        }
 
-        _lots[resolved].push(Lot({amount: amount, unlockTime: unlockTime, minUnlockTime: unlockTime}));
+        uint64 unlockTime = nowTs + waitSeconds;
+
+        _lots[rawTarget].push(Lot({amount: amount, unlockTime: unlockTime, minUnlockTime: unlockTime}));
 
         emit TransferWithInheritance(
-            sender, resolved, amount, unlockTime, unlockTime, characteristic, _lots[resolved].length - 1
+            sender, rawTarget, amount, unlockTime, unlockTime, characteristic, _lots[rawTarget].length - 1
         );
 
         return true;
+    }
+
+    function sweepLot(address recipient, uint256 lotIndex) external {
+        address ownerLogical = _logicalOwnerOf(recipient);
+        if (!_isDead(ownerLogical)) revert RecipientDead();
+
+        Lot[] storage l = _lots[recipient];
+        if (lotIndex >= l.length) revert InsufficientProtectedBalance();
+
+        Lot storage lot = l[lotIndex];
+        uint256 amount = lot.amount;
+        if (amount == 0) revert InsufficientProtectedBalance();
+        if (block.timestamp < lot.unlockTime) revert InsufficientProtectedBalance();
+
+        lot.amount = 0;
+
+        if (lotIndex == _head[recipient]) {
+            uint256 i = _head[recipient];
+            while (i < l.length && l[i].amount == 0) {
+                unchecked {
+                    ++i;
+                }
+            }
+            _head[recipient] = i;
+        }
+
+        address target = _inheritanceTarget(ownerLogical);
+        if (target == address(0)) {
+            _totalSupplyCustom -= amount;
+            emit Transfer(recipient, address(0), amount);
+            emit LotSwept(recipient, lotIndex, address(0), amount);
+        } else {
+            _unprotectedBalances[target] += amount;
+            emit Transfer(recipient, target, amount);
+            emit LotSwept(recipient, lotIndex, target, amount);
+        }
+    }
+
+    function autoSweepIfDead(address owner) external returns (uint256 swept) {
+        return _autoSweepIfDead(_logicalOwnerOf(owner));
+    }
+
+    function _autoSweepIfDead(address ownerLogical) internal returns (uint256 swept) {
+        if (!_isDead(ownerLogical)) return 0;
+
+        address account = _primaryAccountOf(ownerLogical);
+        Lot[] storage l = _lots[account];
+        uint256 i = _head[account];
+        uint256 len = l.length;
+
+        while (i < len) {
+            Lot storage lot = l[i];
+            if (lot.amount == 0) {
+                unchecked {
+                    ++i;
+                }
+                continue;
+            }
+            if (block.timestamp < lot.unlockTime) break;
+
+            swept += lot.amount;
+            lot.amount = 0;
+            unchecked {
+                ++i;
+            }
+        }
+
+        _head[account] = i;
+
+        if (swept == 0) return 0;
+
+        address target = _inheritanceTarget(ownerLogical);
+        if (target == address(0)) {
+            _totalSupplyCustom -= swept;
+            emit Transfer(account, address(0), swept);
+            emit AutoSwept(ownerLogical, address(0), swept);
+        } else {
+            _unprotectedBalances[target] += swept;
+            emit Transfer(account, target, swept);
+            emit AutoSwept(ownerLogical, target, swept);
+        }
+    }
+
+    function _inheritanceTarget(address ownerLogical) internal view returns (address) {
+        address heir = _defaultHeir[ownerLogical];
+        if (heir == address(0)) return address(0);
+
+        address heirLogical = _logicalOwnerOf(heir);
+        if (_isDead(heirLogical)) return address(0);
+
+        return _resolveRecipientRaw(heir);
+    }
+
+    function _primaryAccountOf(address ownerLogical) internal view returns (address) {
+        address sk = registry.signingKeyOf(ownerLogical);
+        if (sk != address(0)) return sk;
+        return ownerLogical;
+    }
+
+    function _resolveInboundTarget(address to) internal returns (address resolved, bool burnIt) {
+        if (to == address(0)) revert ZeroAddress();
+
+        resolved = _resolveRecipientRaw(to);
+        address ownerLogical = _logicalOwnerOf(resolved);
+
+        _autoSweepIfDead(ownerLogical);
+
+        if (_isDead(ownerLogical)) {
+            address target = _inheritanceTarget(ownerLogical);
+            if (target == address(0)) {
+                return (address(0), true);
+            }
+            return (target, false);
+        }
+
+        return (resolved, false);
     }
 
     function _consumeSpendableLots(address user, uint256 amount) internal {
@@ -289,7 +518,7 @@ contract InheritanceDollarVaultUpgradeable is
 
             if (lot.amount <= remaining) {
                 remaining -= lot.amount;
-                delete l[i];
+                lot.amount = 0;
                 unchecked {
                     ++i;
                 }
@@ -304,7 +533,7 @@ contract InheritanceDollarVaultUpgradeable is
         _head[user] = i;
     }
 
-    function _resolveRecipient(address to) internal view returns (address) {
+    function _resolveRecipientRaw(address to) internal view returns (address) {
         if (to == address(0)) revert ZeroAddress();
 
         if (registry.isInitialized(to)) {
@@ -329,10 +558,80 @@ contract InheritanceDollarVaultUpgradeable is
         emit Transfer(from, to, amount);
     }
 
-    function _touchInteraction(address actor) internal {
-        address owner = _logicalOwnerOf(actor);
-        _lastInteraction[owner] = uint64(block.timestamp);
+    function _burnFromUnprotected(address from, uint256 amount) internal {
+        if (_unprotectedBalances[from] < amount) revert InsufficientUnprotectedBalance();
+
+        _unprotectedBalances[from] -= amount;
+        _totalSupplyCustom -= amount;
+
+        emit Transfer(from, address(0), amount);
     }
 
-    uint256[50] private __gap;
+    function _touchSignedOut(address actor) internal {
+        address owner = _logicalOwnerOf(actor);
+        _lastSignedOutTs[owner] = uint64(block.timestamp);
+    }
+
+    function _touchRenew(address actor) internal {
+        address owner = _logicalOwnerOf(actor);
+        _lastRenewTs[owner] = uint64(block.timestamp);
+    }
+
+    function _touchActive(address actor) internal {
+        address owner = _logicalOwnerOf(actor);
+        uint64 nowTs = uint64(block.timestamp);
+        _lastSignedOutTs[owner] = nowTs;
+        _lastRenewTs[owner] = nowTs;
+    }
+
+    function _deathTimestampOf(address ownerLogical) internal view returns (uint64) {
+        uint64 a = _lastSignedOutTs[ownerLogical];
+        uint64 b = _lastRenewTs[ownerLogical];
+        if (a == 0 || b == 0) return 0;
+
+        uint64 da = _shiftByYears(a, INACTIVITY_YEARS);
+        uint64 db = _shiftByYears(b, INACTIVITY_YEARS);
+        return da >= db ? da : db;
+    }
+
+    function _isDead(address ownerLogical) internal view returns (bool) {
+        uint64 deathTs = _deathTimestampOf(ownerLogical);
+        if (deathTs == 0) return false;
+        return uint64(block.timestamp) > deathTs;
+    }
+
+    /// @dev shift by gregorian years preserving intra-year offset, clamp at year end if needed
+    function _shiftByYears(uint64 baseTs, uint16 deltaYears) internal pure returns (uint64) {
+        uint16 y = uint256(baseTs).yearOf();
+
+        uint256 start = Gregorian.yearStartTs(y);
+        while (start > uint256(baseTs)) {
+            unchecked {
+                y--;
+            }
+            start = Gregorian.yearStartTs(y);
+        }
+
+        uint256 end_ = Gregorian.yearEndTs(y);
+        while (uint256(baseTs) >= end_) {
+            unchecked {
+                y++;
+            }
+            start = end_;
+            end_ = Gregorian.yearEndTs(y);
+        }
+
+        uint256 offset = uint256(baseTs) - start;
+        uint16 targetYear = y + deltaYears;
+
+        uint256 tStart = Gregorian.yearStartTs(targetYear);
+        uint256 tEnd = Gregorian.yearEndTs(targetYear);
+
+        uint256 shifted = tStart + offset;
+        if (shifted >= tEnd) shifted = tEnd - 1;
+
+        return uint64(shifted);
+    }
+
+    uint256[46] private __gap;
 }

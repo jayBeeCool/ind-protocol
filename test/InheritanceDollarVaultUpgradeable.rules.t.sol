@@ -40,8 +40,8 @@ contract InheritanceDollarVaultUpgradeableRulesTest is Test {
 
     function test_constants_are_correct() external view {
         assertEq(ind.MIN_INHERITANCE_WAIT(), 1 days);
-        assertEq(ind.MAX_INHERITANCE_WAIT(), 50 * 365 days);
-        assertEq(ind.DEAD_AFTER(), 7 * 365 days);
+        assertEq(ind.INACTIVITY_YEARS(), 7);
+        assertEq(ind.MAX_WAIT_YEARS(), 50);
     }
 
     function test_transferWithInheritance_reverts_below_24h() external {
@@ -50,36 +50,32 @@ contract InheritanceDollarVaultUpgradeableRulesTest is Test {
         ind.transferWithInheritance(bob, 1 ether, uint64(1 days - 1), bytes32(0));
     }
 
-    function test_transferWithInheritance_accepts_exactly_24h() external {
+    function test_transferWithInheritance_accepts_exactly_max_gregorian_wait() external {
+        uint64 maxWait = ind.maxInheritanceWaitNow();
+
         vm.prank(alice);
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), bytes32(0)));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, maxWait, bytes32(0)));
 
         assertEq(ind.protectedBalanceOf(bob), 1 ether);
         assertEq(ind.balanceOf(bob), 0);
     }
 
-    function test_transferWithInheritance_accepts_exactly_50_years() external {
-        vm.prank(alice);
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(50 * 365 days), bytes32(0)));
+    function test_transferWithInheritance_reverts_above_max_gregorian_wait() external {
+        uint64 maxWait = ind.maxInheritanceWaitNow();
 
-        assertEq(ind.protectedBalanceOf(bob), 1 ether);
-        assertEq(ind.balanceOf(bob), 0);
-    }
-
-    function test_transferWithInheritance_reverts_above_50_years() external {
         vm.prank(alice);
         vm.expectRevert(InheritanceDollarVaultUpgradeable.InheritanceWaitTooLong.selector);
-        ind.transferWithInheritance(bob, 1 ether, uint64(50 * 365 days + 1), bytes32(0));
+        ind.transferWithInheritance(bob, 1 ether, maxWait + 1, bytes32(0));
     }
 
-    function test_isDead_after_7_years_without_interaction() external {
-        uint64 t0 = ind.lastInteractionOf(alice);
-        assertGt(t0, 0);
+    function test_isDead_after_7_gregorian_years_without_interaction() external {
+        uint64 deathTs = ind.deathTimestampOf(alice);
+        assertGt(deathTs, 0);
 
-        vm.warp(block.timestamp + 7 * 365 days);
+        vm.warp(deathTs);
         assertFalse(ind.isDead(alice));
 
-        vm.warp(block.timestamp + 1);
+        vm.warp(deathTs + 1);
         assertTrue(ind.isDead(alice));
     }
 
@@ -106,5 +102,17 @@ contract InheritanceDollarVaultUpgradeableRulesTest is Test {
 
         uint64 afterTs = ind.lastInteractionOf(alice);
         assertGt(afterTs, beforeTs);
+    }
+
+    function test_keepAlive_refreshes_renew_branch_only_but_prevents_death_if_signedout_is_old() external {
+        uint64 deathTs = ind.deathTimestampOf(alice);
+        assertGt(deathTs, 0);
+
+        vm.warp(deathTs);
+        vm.prank(alice);
+        ind.keepAlive();
+
+        vm.warp(block.timestamp + 1);
+        assertFalse(ind.isDead(alice));
     }
 }
