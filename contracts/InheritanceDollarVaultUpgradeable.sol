@@ -643,12 +643,14 @@ contract InheritanceDollarVaultUpgradeable is
         }
 
         uint64 unlockTime = nowTs + waitSeconds;
+        uint64 minUnlockTime = nowTs + MIN_INHERITANCE_WAIT;
+
         _lots[rawTarget].push(
-            Lot({senderOwner: fromOwner, amount: amount, unlockTime: unlockTime, minUnlockTime: unlockTime})
+            Lot({senderOwner: fromOwner, amount: amount, unlockTime: unlockTime, minUnlockTime: minUnlockTime})
         );
 
         emit TransferWithInheritance(
-            from, rawTarget, amount, unlockTime, unlockTime, characteristic, _lots[rawTarget].length - 1
+            from, rawTarget, amount, unlockTime, minUnlockTime, characteristic, _lots[rawTarget].length - 1
         );
 
         return true;
