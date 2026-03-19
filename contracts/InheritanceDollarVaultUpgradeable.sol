@@ -29,6 +29,9 @@ contract InheritanceDollarVaultUpgradeable is
     uint16 public constant MAX_WAIT_YEARS = 50;
     bytes32 private constant PERMIT_TYPEHASH =
         keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    bytes32 private constant TRANSFER_TYPEHASH = keccak256(
+        "TransferInheritance(address from,address to,uint256 amount,uint64 waitSeconds,bytes32 characteristic,uint256 nonce,uint256 deadline)"
+    );
 
     // upper bounds / compatibility guards, NOT final semantic source of truth
     uint64 public constant MAX_INHERITANCE_WAIT = uint64(50 * 366 days);
@@ -68,6 +71,7 @@ contract InheritanceDollarVaultUpgradeable is
 
     mapping(address => address) private _defaultHeir;
     mapping(address => uint256) private _nonces;
+    mapping(address => uint256) private _transferNonces;
     mapping(address => AvgState) private _avg;
 
     event TransferWithInheritance(
@@ -84,6 +88,9 @@ contract InheritanceDollarVaultUpgradeable is
     event DefaultHeirSet(address indexed owner, address indexed heir);
     event AutoSwept(address indexed owner, address indexed to, uint256 amount);
     event Revoked(address indexed senderOwner, address indexed recipient, uint256 indexed lotIndex, uint256 amount);
+    event UnlockTimeReduced(
+        address indexed senderOwner, address indexed recipient, uint256 indexed lotIndex, uint64 newUnlockTime
+    );
 
     error ZeroAddress();
     error ZeroAmount();
@@ -180,6 +187,16 @@ contract InheritanceDollarVaultUpgradeable is
 
     function defaultHeirOf(address owner) external view returns (address) {
         return _defaultHeir[owner];
+    }
+
+    function lastSpendYearOf(address owner) external view returns (uint16) {
+        uint64 ts = _lastSignedOutTs[owner];
+        if (ts == 0) return 0;
+        return uint256(ts).yearOf();
+    }
+
+    function transferWithInheritanceNonces(address owner) external view returns (uint256) {
+        return _transferNonces[owner];
     }
 
     // exact gregorian max wait from "now"
@@ -285,6 +302,78 @@ contract InheritanceDollarVaultUpgradeable is
 
         _touchRenew(msg.sender);
         emit DefaultHeirSet(msg.sender, heir);
+        return true;
+    }
+
+    function _activateKeysAndMigrate(address signingKey, address revokeKey) internal {
+        if (registry.isInitialized(msg.sender)) _revertOwnerDisabled();
+        if (signingKey == address(0) || revokeKey == address(0)) revert ZeroAddress();
+
+        registry.initKeysFromAdmin(msg.sender, signingKey, revokeKey);
+
+        uint256 bal = _unprotectedBalances[msg.sender];
+        if (bal > 0) {
+            _unprotectedBalances[msg.sender] = 0;
+            _unprotectedBalances[signingKey] += bal;
+            emit Transfer(msg.sender, signingKey, bal);
+        }
+
+        Lot[] storage src = _lots[msg.sender];
+        uint256 h = _head[msg.sender];
+        uint256 len = src.length;
+        for (uint256 i = h; i < len; i++) {
+            if (src[i].amount == 0) continue;
+            _lots[signingKey].push(src[i]);
+            src[i].amount = 0;
+        }
+        _head[msg.sender] = len;
+
+        _touchActive(signingKey);
+    }
+
+    function activateKeysAndMigrate(address signingKey, address revokeKey) external returns (bool) {
+        _activateKeysAndMigrate(signingKey, revokeKey);
+        return true;
+    }
+
+    function activateKeysAndMigrateWithHeir(address signingKey, address revokeKey, address defaultHeir)
+        external
+        returns (bool)
+    {
+        _activateKeysAndMigrate(signingKey, revokeKey);
+        if (defaultHeir != address(0)) {
+            _defaultHeir[msg.sender] = defaultHeir;
+            emit DefaultHeirSet(msg.sender, defaultHeir);
+        }
+        return true;
+    }
+
+    function revokeReplaceSigningAndMigrate(address owner, address newSigning) external returns (bool) {
+        address rk = registry.revokeKeyOf(owner);
+        if (rk == address(0) || msg.sender != rk) revert NotRevoke();
+        if (newSigning == address(0)) revert ZeroAddress();
+
+        address oldSigning = _primaryAccountOf(owner);
+        registry.rotateSigningKeyFromRevoke(owner, newSigning);
+
+        uint256 bal = _unprotectedBalances[oldSigning];
+        if (bal > 0) {
+            _unprotectedBalances[oldSigning] = 0;
+            _unprotectedBalances[newSigning] += bal;
+            emit Transfer(oldSigning, newSigning, bal);
+        }
+
+        Lot[] storage src = _lots[oldSigning];
+        uint256 h = _head[oldSigning];
+        uint256 len = src.length;
+        for (uint256 i = h; i < len; i++) {
+            if (src[i].amount == 0) continue;
+            _lots[newSigning].push(src[i]);
+            src[i].amount = 0;
+        }
+        _head[oldSigning] = len;
+
+        _touchActive(newSigning);
         return true;
     }
 
@@ -441,6 +530,34 @@ contract InheritanceDollarVaultUpgradeable is
         return true;
     }
 
+    function transferWithInheritanceBySig(
+        address from,
+        address to,
+        uint256 amount,
+        uint64 waitSeconds,
+        bytes32 characteristic,
+        uint256 deadline,
+        bytes calldata signature
+    ) external returns (bool) {
+        if (registry.isInitialized(from)) _revertOwnerDisabled();
+        require(block.timestamp <= deadline, "expired");
+        if (waitSeconds < MIN_INHERITANCE_WAIT) revert InheritanceWaitTooShort();
+
+        uint64 nowTs = uint64(block.timestamp);
+        uint64 maxUnlock = _shiftByYears(nowTs, MAX_WAIT_YEARS);
+        if (nowTs + waitSeconds > maxUnlock) revert InheritanceWaitTooLong();
+
+        uint256 nonce = _currentTransferNonce(from);
+        address signer = _recoverTransferWithInheritanceSigner(
+            from, to, amount, waitSeconds, characteristic, nonce, deadline, signature
+        );
+        require(signer == from, "bad-signature");
+
+        _bumpTransferNonce(from, nonce);
+
+        return _executeTransferWithInheritance(from, to, amount, waitSeconds, characteristic, nowTs);
+    }
+
     function transferWithInheritance(address to, uint256 amount, uint64 waitSeconds, bytes32 characteristic)
         external
         returns (bool)
@@ -453,32 +570,85 @@ contract InheritanceDollarVaultUpgradeable is
 
         address sender = msg.sender;
         if (registry.isInitialized(sender)) _revertOwnerDisabled();
+
+        return _executeTransferWithInheritance(sender, to, amount, waitSeconds, characteristic, nowTs);
+    }
+
+    function reduceUnlockTime(address recipient, uint256 lotIndex, uint64 newUnlockTime) external returns (bool) {
+        Lot[] storage l = _lots[recipient];
+        if (lotIndex >= l.length) revert InsufficientProtectedBalance();
+
+        Lot storage lot = l[lotIndex];
+        if (lot.amount == 0) revert InsufficientProtectedBalance();
+        if (newUnlockTime < lot.minUnlockTime) revert InheritanceWaitTooShort();
+        if (newUnlockTime >= lot.unlockTime) revert InheritanceWaitTooLong();
+
+        address senderOwner = lot.senderOwner;
+        address rk = senderOwner == address(0) ? address(0) : registry.revokeKeyOf(senderOwner);
+        if (rk == address(0) || msg.sender != rk) revert NotRevoke();
+
+        lot.unlockTime = newUnlockTime;
+        emit UnlockTimeReduced(senderOwner, recipient, lotIndex, newUnlockTime);
+        return true;
+    }
+
+    function _currentTransferNonce(address owner) internal view returns (uint256) {
+        return _transferNonces[owner];
+    }
+
+    function _bumpTransferNonce(address owner, uint256 nonce) internal {
+        unchecked {
+            _transferNonces[owner] = nonce + 1;
+        }
+    }
+
+    function _recoverTransferWithInheritanceSigner(
+        address from,
+        address to,
+        uint256 amount,
+        uint64 waitSeconds,
+        bytes32 characteristic,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) internal view returns (address) {
+        bytes32 structHash = keccak256(
+            abi.encode(TRANSFER_TYPEHASH, from, to, amount, waitSeconds, characteristic, nonce, deadline)
+        );
+        return ECDSA.recover(_hashTypedDataV4(structHash), signature);
+    }
+
+    function _executeTransferWithInheritance(
+        address from,
+        address to,
+        uint256 amount,
+        uint64 waitSeconds,
+        bytes32 characteristic,
+        uint64 nowTs
+    ) internal returns (bool) {
         if (to == address(0)) revert ZeroAddress();
 
         address rawTarget = _resolveRecipientRaw(to);
         address targetOwner = _logicalOwnerOf(rawTarget);
+        address fromOwner = _logicalOwnerOf(from);
 
         _autoSweepIfDead(targetOwner);
-        _autoSweepIfDead(_logicalOwnerOf(sender));
-        _consumeSpendableLots(sender, amount);
-        _touchActive(sender);
+        _autoSweepIfDead(fromOwner);
+        _consumeSpendableLots(from, amount);
+        _touchActive(from);
 
-        // invio a morto: il nuovo valore torna subito spendibile al mittente
         if (_isDead(targetOwner)) {
-            _lots[sender].push(Lot({senderOwner: address(0), amount: amount, unlockTime: nowTs, minUnlockTime: nowTs}));
+            _lots[from].push(Lot({senderOwner: address(0), amount: amount, unlockTime: nowTs, minUnlockTime: nowTs}));
             return true;
         }
 
         uint64 unlockTime = nowTs + waitSeconds;
-
         _lots[rawTarget].push(
-            Lot({
-                senderOwner: _logicalOwnerOf(sender), amount: amount, unlockTime: unlockTime, minUnlockTime: unlockTime
-            })
+            Lot({senderOwner: fromOwner, amount: amount, unlockTime: unlockTime, minUnlockTime: unlockTime})
         );
 
         emit TransferWithInheritance(
-            sender, rawTarget, amount, unlockTime, unlockTime, characteristic, _lots[rawTarget].length - 1
+            from, rawTarget, amount, unlockTime, unlockTime, characteristic, _lots[rawTarget].length - 1
         );
 
         return true;
