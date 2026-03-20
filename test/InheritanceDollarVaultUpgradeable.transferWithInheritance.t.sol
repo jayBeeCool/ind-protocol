@@ -42,10 +42,10 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
         assertTrue(ind.transferWithInheritance(bob, 40 ether, 86400, bytes32(0)));
         vm.stopPrank();
 
-        assertEq(ind.balanceOf(alice), 40 ether);
+        assertEq(ind.unprotectedBalanceOf(alice), 40 ether);
         assertEq(ind.protectedBalanceOf(alice), 20 ether);
 
-        assertEq(ind.balanceOf(bob), 0);
+        assertEq(ind.unprotectedBalanceOf(bob), 0);
         assertEq(ind.protectedBalanceOf(bob), 40 ether);
     }
 
@@ -54,9 +54,9 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
         vm.expectRevert(InheritanceDollarVaultUpgradeable.InsufficientProtectedBalance.selector);
         ind.transferWithInheritance(bob, 10 ether, 86400, bytes32(0));
 
-        assertEq(ind.balanceOf(alice), 100 ether);
+        assertEq(ind.unprotectedBalanceOf(alice), 100 ether);
         assertEq(ind.protectedBalanceOf(alice), 0);
-        assertEq(ind.balanceOf(bob), 0);
+        assertEq(ind.unprotectedBalanceOf(bob), 0);
         assertEq(ind.protectedBalanceOf(bob), 0);
     }
 
@@ -66,14 +66,14 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
         ind.transferWithInheritance(bob, 50 ether, 86400, bytes32(0));
         vm.stopPrank();
 
-        assertEq(ind.balanceOf(bob), 0);
+        assertEq(ind.unprotectedBalanceOf(bob), 0);
         assertEq(ind.protectedBalanceOf(bob), 50 ether);
 
         vm.prank(bob);
         vm.expectRevert(InheritanceDollarVaultUpgradeable.InsufficientUnprotectedBalance.selector);
         ind.transfer(carol, 1 ether);
 
-        assertEq(ind.balanceOf(carol), 0);
+        assertEq(ind.unprotectedBalanceOf(carol), 0);
         assertEq(ind.protectedBalanceOf(carol), 0);
     }
 
@@ -84,11 +84,11 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
         vm.prank(alice);
         ind.transferWithInheritance(bob, 25 ether, uint64(1 days), bytes32(uint256(7)));
 
-        assertEq(ind.balanceOf(alice), 75 ether);
+        assertEq(ind.unprotectedBalanceOf(alice), 75 ether);
         assertEq(ind.protectedBalanceOf(alice), 0);
-        assertEq(ind.balanceOf(bob), 0);
+        assertEq(ind.unprotectedBalanceOf(bob), 0);
         assertEq(ind.protectedBalanceOf(bob), 25 ether);
-        assertEq(ind.totalUserBalanceOf(alice), 75 ether);
-        assertEq(ind.totalUserBalanceOf(bob), 25 ether);
+        assertEq(ind.unprotectedBalanceOf(alice), 75 ether);
+        assertEq(ind.balanceOf(bob), 25 ether);
     }
 }

@@ -251,7 +251,7 @@ contract InheritanceDollarTest is Test {
         ind.transfer(alice, 1 ether);
         // owner tries to transfer -> MUST revert (owner-disabled)
         vm.prank(alice);
-        vm.expectRevert(bytes("owner-disabled"));
+        vm.expectRevert(bytes4(keccak256("OwnerDisabled()")));
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(bob, 1 ether);
     }

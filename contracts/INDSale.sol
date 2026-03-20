@@ -13,8 +13,7 @@ contract INDSale is AccessControl, ReentrancyGuard {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     // Burn sink irreversibile in pratica
-    address payable public constant ETH_BURN_SINK =
-        payable(0x000000000000000000000000000000000000dEaD);
+    address payable public constant ETH_BURN_SINK = payable(0x000000000000000000000000000000000000dEaD);
 
     // Compat fallback only: if the token still exposes only mintWithMantissa(...)
     // the sale can still mint using a neutral fixed payload.
@@ -93,11 +92,11 @@ contract INDSale is AccessControl, ReentrancyGuard {
 
         _mintIND(recipient, outWei);
 
-        (bool burnOk, ) = ETH_BURN_SINK.call{value: ethUsed}("");
+        (bool burnOk,) = ETH_BURN_SINK.call{value: ethUsed}("");
         if (!burnOk) revert BurnFailed();
 
         if (refund > 0) {
-            (bool refundOk, ) = payable(refundTo).call{value: refund}("");
+            (bool refundOk,) = payable(refundTo).call{value: refund}("");
             if (!refundOk) revert RefundFailed();
         }
 
@@ -116,15 +115,16 @@ contract INDSale is AccessControl, ReentrancyGuard {
 
         // Backward-compatible path: mintWithMantissa(address,uint256,uint64,bytes32)
         {
-            (bool ok, bytes memory ret) = address(ind).call(
-                abi.encodeWithSignature(
-                    "mintWithMantissa(address,uint256,uint64,bytes32)",
-                    recipient,
-                    amountWei,
-                    COMPAT_WAIT_SECONDS,
-                    COMPAT_CHARACTERISTIC
-                )
-            );
+            (bool ok, bytes memory ret) = address(ind)
+                .call(
+                    abi.encodeWithSignature(
+                        "mintWithMantissa(address,uint256,uint64,bytes32)",
+                        recipient,
+                        amountWei,
+                        COMPAT_WAIT_SECONDS,
+                        COMPAT_CHARACTERISTIC
+                    )
+                );
             if (ok) {
                 if (ret.length == 0 || abi.decode(ret, (bool))) return;
             }

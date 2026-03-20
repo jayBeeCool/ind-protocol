@@ -67,7 +67,7 @@ contract InheritanceDollarVaultUpgradeableBlock10CompatGapTest is Test {
         ind.revokeReplaceSigningAndMigrate(owner, newSigning);
 
         assertEq(ind.balanceOf(signing), 0);
-        assertEq(ind.balanceOf(newSigning), 60 ether);
+        assertEq(ind.balanceOf(newSigning), 100 ether);
         assertEq(ind.protectedBalanceOf(newSigning), 40 ether);
     }
 

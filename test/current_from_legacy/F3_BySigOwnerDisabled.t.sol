@@ -13,7 +13,7 @@ contract F3_BySigOwnerDisabled_Test is InheritanceDollarTest {
 
         uint64 w = ind.MIN_WAIT_SECONDS();
 
-        vm.expectRevert(bytes("owner-disabled"));
+        vm.expectRevert(bytes4(keccak256("OwnerDisabled()")));
 
         ind.transferWithInheritanceBySig(
             owner, address(0xBEEF), 1 ether, w, bytes32(0), block.timestamp + 1 days, hex"00"

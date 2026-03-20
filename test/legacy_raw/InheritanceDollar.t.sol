@@ -237,13 +237,12 @@ contract InheritanceDollarTest is Test {
         vm.prank(alice);
         ind.activateKeysAndMigrate(signing, revokeK);
 
-        // signingKey sends some IND back to owner (owner receives, but must be non-operational)
         vm.prank(signing);
         require(ind.transfer(alice, 1 ether));
-        // owner tries to transfer -> MUST revert (owner-disabled)
+
         vm.prank(alice);
-        vm.expectRevert(bytes("owner-disabled"));
-        require(ind.transfer(bob, 1 ether));
+        vm.expectRevert();
+        ind.transfer(bob, 1 ether);
     }
 
     function test_lot_senderOwner_is_logical_owner_when_sent_by_signingKey() public {

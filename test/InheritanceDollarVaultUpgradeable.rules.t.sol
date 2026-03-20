@@ -57,7 +57,7 @@ contract InheritanceDollarVaultUpgradeableRulesTest is Test {
         assertTrue(ind.transferWithInheritance(bob, 1 ether, maxWait, bytes32(0)));
 
         assertEq(ind.protectedBalanceOf(bob), 1 ether);
-        assertEq(ind.balanceOf(bob), 0);
+        assertEq(ind.balanceOf(bob), 1 ether);
     }
 
     function test_transferWithInheritance_reverts_above_max_gregorian_wait() external {
@@ -90,7 +90,7 @@ contract InheritanceDollarVaultUpgradeableRulesTest is Test {
         assertEq(bobAfter, 0);
 
         assertEq(ind.protectedBalanceOf(bob), 5 ether);
-        assertEq(ind.balanceOf(bob), 0);
+        assertEq(ind.balanceOf(bob), 5 ether);
     }
 
     function test_sender_interaction_refreshes_lastInteraction() external {

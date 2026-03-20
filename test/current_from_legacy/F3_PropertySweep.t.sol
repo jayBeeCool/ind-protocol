@@ -25,55 +25,51 @@ contract F3_PropertySweep_Test is Test {
         ind.mint(alice, 10 ether);
         vm.stopPrank();
 
-        vm.prank(alice);
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        ind.transfer(bob, 10 ether);
+        uint64 w = ind.MIN_WAIT_SECONDS();
 
-        vm.warp(block.timestamp + ind.MIN_WAIT_SECONDS());
+        vm.prank(alice);
+        ind.transferWithInheritance(bob, 10 ether, w, bytes32(0));
+
+        vm.warp(block.timestamp + w);
 
         uint256 supplyBefore = ind.totalSupply();
 
-        // attempt sweep
         try ind.sweepLot(bob, 0) {} catch {}
 
         uint256 supplyAfter = ind.totalSupply();
 
-        // If supply decreased, then both must be dead.
-        if (supplyAfter < supplyBefore) {
-            // If burn happened, recipient must be dead
-            // and sender must be dead
-            // Otherwise this is a violation
-            bool recipientDead = false;
-            bool senderDead = false;
-
-            // We simulate detection logic:
-            // Since no activation happened,
-            // accounts are treated alive.
-
-            assertTrue(recipientDead && senderDead);
-        }
+        // sender alice è vivo, quindi anche se sweep parte non deve bruciare:
+        // al massimo rimborsa/refonde, ma la supply non deve scendere.
+        assertEq(supplyAfter, supplyBefore);
     }
 
     function test_property_burn_implies_recipient_dead() public {
+        address rOwner = address(0xB101);
+        address rSk = address(0xB102);
+        address rRk = address(0xB103);
+
+        vm.prank(rOwner);
+        ind.activateKeysAndMigrateWithHeir(rSk, rRk, address(0));
+
         vm.startPrank(admin);
         ind.mint(alice, 10 ether);
+        ind.mint(rSk, 2 ether);
         vm.stopPrank();
 
+        uint64 w = ind.MIN_WAIT_SECONDS();
+
         vm.prank(alice);
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        ind.transfer(bob, 10 ether);
+        ind.transferWithInheritance(rSk, 10 ether, w, bytes32(0));
 
-        vm.warp(block.timestamp + ind.MIN_WAIT_SECONDS());
+        vm.warp(block.timestamp + w);
 
-        uint256 supplyBefore = ind.totalSupply();
+        // destinatario ancora vivo: facciamo un outgoing firmato recente
+        vm.prank(rSk);
+        ind.transfer(address(0xD00D), 1);
 
-        // Attempt sweep (recipient still alive)
-        try ind.sweepLot(bob, 0) {} catch {}
-
-        uint256 supplyAfter = ind.totalSupply();
-
-        // If supply decreased here, it's a bug
-        assertEq(supplyAfter, supplyBefore);
+        uint256 lotIndex = ind.getLots(rSk).length - 1;
+        vm.expectRevert(bytes("recipient-alive"));
+        ind.sweepLot(rSk, lotIndex);
     }
 
     function test_property_burn_happens_only_when_fully_dead() public {

@@ -68,8 +68,8 @@ contract InheritanceDollarVaultUpgradeableBlock8PermitAvgTest is Test {
         vm.prank(spender);
         ind.transferFrom(owner, bob, 20 ether);
 
-        assertEq(ind.balanceOf(bob), 20 ether);
-        assertEq(ind.balanceOf(owner), 0);
+        assertEq(ind.unprotectedBalanceOf(bob), 20 ether);
+        assertEq(ind.unprotectedBalanceOf(owner), 0);
         assertEq(ind.protectedBalanceOf(owner), 80 ether);
     }
 

@@ -8,7 +8,7 @@ import "../contracts/INDOpenDepositReceiver.sol";
 
 contract DeploySepoliaSaleStack is Script {
     // vecchio IND Sepolia con 10B già mintati
-    address constant IND_ADDR  = 0xC9A8F1017665D64A7E809886b7Df51dc232d3051;
+    address constant IND_ADDR = 0xC9A8F1017665D64A7E809886b7Df51dc232d3051;
 
     // vero admin/minter del vecchio stack
     address constant SAFE_ADMIN = 0x0527A7671b4B05f20678b8D93EF072c15F6E4aF9;

@@ -154,7 +154,7 @@ contract InheritanceDollarVaultUpgradeable is
     }
 
     function balanceOf(address account) public view override returns (uint256) {
-        return _unprotectedBalances[account];
+        return _unprotectedBalances[account] + protectedBalanceOf(account);
     }
 
     function unprotectedBalanceOf(address account) public view returns (uint256) {
@@ -259,16 +259,12 @@ contract InheritanceDollarVaultUpgradeable is
         }
     }
 
-    function totalUserBalanceOf(address user) public view returns (uint256) {
-        return _unprotectedBalances[user] + protectedBalanceOf(user);
-    }
-
     function averageBalanceThisYear(address user) external view returns (uint256 avg) {
         address owner = _logicalOwnerOf(user);
         AvgState storage st = _avg[owner];
 
         if (st.lastTs == 0) {
-            return totalUserBalanceOf(_primaryAccountOf(owner));
+            return balanceOf(_primaryAccountOf(owner));
         }
 
         uint256 acc = st.acc;
@@ -873,7 +869,7 @@ contract InheritanceDollarVaultUpgradeable is
         AvgState storage st = _avg[owner];
         uint16 yNow = uint256(block.timestamp).yearOf();
         uint64 tNow = uint64(block.timestamp);
-        uint256 balNow = totalUserBalanceOf(_primaryAccountOf(owner));
+        uint256 balNow = balanceOf(_primaryAccountOf(owner));
         uint64 yStart = uint64(Gregorian.yearStartTs(yNow));
 
         if (st.lastTs == 0) {
@@ -905,7 +901,7 @@ contract InheritanceDollarVaultUpgradeable is
         AvgState storage st = _avg[owner];
         uint16 yNow = uint256(block.timestamp).yearOf();
         uint64 tNow = uint64(block.timestamp);
-        uint256 balNow = totalUserBalanceOf(_primaryAccountOf(owner));
+        uint256 balNow = balanceOf(_primaryAccountOf(owner));
         uint64 yStart = uint64(Gregorian.yearStartTs(yNow));
 
         if (st.lastTs == 0) {
@@ -947,7 +943,7 @@ contract InheritanceDollarVaultUpgradeable is
         lastTs = st.lastTs;
         acc = st.acc;
         lastBal = st.lastBal;
-        totalNow = totalUserBalanceOf(primaryAccount);
+        totalNow = balanceOf(primaryAccount);
     }
 
     function _touchSignedOut(address actor) internal {

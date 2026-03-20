@@ -12,12 +12,7 @@ contract INDDepositReceiver {
     IINDSaleReceiver public immutable sale;
     address public immutable recipient;
 
-    event DepositForwarded(
-        address indexed from,
-        address indexed recipient,
-        uint256 ethIn,
-        uint256 indOut
-    );
+    event DepositForwarded(address indexed from, address indexed recipient, uint256 ethIn, uint256 indOut);
 
     error ZeroSale();
     error ZeroRecipient();

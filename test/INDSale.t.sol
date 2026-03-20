@@ -11,12 +11,7 @@ contract MockIND {
     address public lastTo;
     uint256 public lastAmount;
 
-    function mintWithMantissa(
-        address to,
-        uint256 amount,
-        uint64,
-        bytes32
-    ) external returns (bool) {
+    function mintWithMantissa(address to, uint256 amount, uint64, bytes32) external returns (bool) {
         totalSupply += amount;
         lastTo = to;
         lastAmount = amount;
@@ -32,8 +27,7 @@ contract INDSaleTest is Test {
     address internal buyer = address(0xB0B);
     address internal recipient = address(0xCAFE);
 
-    address payable internal constant ETH_BURN_SINK =
-        payable(0x000000000000000000000000000000000000dEaD);
+    address payable internal constant ETH_BURN_SINK = payable(0x000000000000000000000000000000000000dEaD);
 
     function setUp() public {
         ind = new MockIND();
@@ -136,14 +130,14 @@ contract INDSaleTest is Test {
     function test_fallback_reverts() public {
         vm.prank(buyer);
         vm.expectRevert(bytes("use buy"));
-        (bool ok, ) = address(sale).call{value: 1 ether}(hex"1234");
+        (bool ok,) = address(sale).call{value: 1 ether}(hex"1234");
         ok;
     }
 
     function test_receive_reverts() public {
         vm.prank(buyer);
         vm.expectRevert(bytes("use buy"));
-        (bool ok, ) = address(sale).call{value: 1 ether}("");
+        (bool ok,) = address(sale).call{value: 1 ether}("");
         ok;
     }
 }

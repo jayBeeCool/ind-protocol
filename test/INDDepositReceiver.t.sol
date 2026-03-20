@@ -12,12 +12,7 @@ contract MockINDForReceiver {
     address public lastTo;
     uint256 public lastAmount;
 
-    function mintWithMantissa(
-        address to,
-        uint256 amount,
-        uint64,
-        bytes32
-    ) external returns (bool) {
+    function mintWithMantissa(address to, uint256 amount, uint64, bytes32) external returns (bool) {
         totalSupply += amount;
         lastTo = to;
         lastAmount = amount;
@@ -34,8 +29,7 @@ contract INDDepositReceiverTest is Test {
     address internal buyer = address(0xB0B);
     address internal recipient = address(0xCAFE);
 
-    address payable internal constant ETH_BURN_SINK =
-        payable(0x000000000000000000000000000000000000dEaD);
+    address payable internal constant ETH_BURN_SINK = payable(0x000000000000000000000000000000000000dEaD);
 
     function setUp() public {
         ind = new MockINDForReceiver();
@@ -51,7 +45,7 @@ contract INDDepositReceiverTest is Test {
         uint256 burnBefore = ETH_BURN_SINK.balance;
 
         vm.prank(buyer);
-        (bool ok, ) = address(receiver).call{value: ethIn}("");
+        (bool ok,) = address(receiver).call{value: ethIn}("");
         assertTrue(ok, "plain send failed");
 
         assertEq(ind.lastTo(), recipient, "recipient mismatch");

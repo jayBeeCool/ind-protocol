@@ -10,12 +10,10 @@ import {INDKeyRegistry} from "./INDKeyRegistry.sol";
 
 contract InheritanceDollar is ERC20Permit, AccessControl {
     function _revertOwnerDisabled() private pure {
-        assembly {
-            mstore(0x00, 0xf28dceb300000000000000000000000000000000000000000000000000000000)
-            revert(0x00, 0x04)
-        }
+        revert OwnerDisabled();
     }
     error RecipientDead();
+    error OwnerDisabled();
 
     using ECDSA for bytes32;
     using Gregorian for uint256;
@@ -352,10 +350,10 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         require(block.timestamp >= lot.unlockTime, "not-unlocked");
 
         address recipOwner = _logicalOwnerOf(recipient);
-        require(_isDead(recipOwner), "recipient-alive");
+        require(_isDeadStrict(recipOwner), "recipient-alive");
 
         address senderOwner = lot.senderOwner; // logical owner already stored
-        bool senderDead = (senderOwner == address(0)) ? true : _isDead(senderOwner);
+        bool senderDead = (senderOwner == address(0)) ? true : _isDeadStrict(senderOwner);
 
         lot.amount = 0;
 
@@ -800,8 +798,8 @@ contract InheritanceDollar is ERC20Permit, AccessControl {
         uint64 spend = _lastSignedOutTs[ownerLogical];
         uint64 renew = _lastRenewTs[ownerLogical];
 
-        // Never-seen => treat as dead (STRICT)
-        if (spend == 0 && renew == 0) return true;
+        // Never-seen => not dead yet; death requires 7 years without spend and without renew
+        if (spend == 0 && renew == 0) return false;
 
         uint64 cutoff = _shiftBackByPolicy(uint64(block.timestamp), uint256(DEAD_AFTER_SECONDS));
 
