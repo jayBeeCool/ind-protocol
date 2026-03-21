@@ -31,8 +31,10 @@ contract F3_DeadDefaultHeir_Test is InheritanceDollarTest {
         // make BOTH owners "not-last=0" then dead later:
         // any outgoing transfer from signingKey touches _lastSignedOutTs[owner]
         vm.prank(sSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         require(ind.transfer(address(0xD00D), 1));
         vm.prank(rSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         require(ind.transfer(address(0xD00D), 1));
         // create the inheritance lot from sender signingKey to recipient signingKey
         vm.prank(sSk);
@@ -75,8 +77,10 @@ contract F3_DeadDefaultHeir_Test is InheritanceDollarTest {
         vm.stopPrank();
         // touch outgoing for both to enable dead detection later
         vm.prank(sSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         require(ind.transfer(address(0xD00D), 1));
         vm.prank(rSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         require(ind.transfer(address(0xD00D), 1));
         // create lot
         vm.prank(sSk);

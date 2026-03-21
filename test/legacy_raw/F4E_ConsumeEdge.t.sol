@@ -24,6 +24,7 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
 
         vm.prank(alice);
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(rOwner, 10 ether);
 
         // unlock lots
@@ -31,6 +32,7 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
 
         // touch signed outgoing for recipient owner (must be from signingKey!)
         vm.prank(rSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(address(0xD00D), 1); // spends 1 wei from unlocked lot, sets lastSignedOutTs[rOwner]
 
         // now warp beyond dead threshold
@@ -54,6 +56,7 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
         vm.prank(bob);
         vm.expectRevert(bytes("insufficient-spendable"));
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(alice, 1 ether);
     }
 
@@ -63,11 +66,13 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
 
         vm.prank(alice);
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(bob, 10 ether);
 
         vm.warp(block.timestamp + 1 days);
 
         vm.prank(bob);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(alice, 5 ether);
 
@@ -91,6 +96,7 @@ contract F4E_ConsumeEdge is InheritanceDollarTest {
 
         // only first lot unlocked (10 ether)
         vm.prank(bob);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(alice, 7 ether);
 

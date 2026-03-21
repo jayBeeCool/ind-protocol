@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-import {InheritanceDollar} from "../../contracts/InheritanceDollarCompat.sol";
+
+import {InheritanceDollar} from "../../contracts/InheritanceDollar.sol";
 import {Test} from "forge-std/Test.sol";
-import "../../contracts/InheritanceDollarCompat.sol";
+import {INDKeyRegistry} from "../../contracts/InheritanceDollarCompat.sol";
 
 contract INDHandler is Test {
     InheritanceDollar public ind;
@@ -31,8 +32,6 @@ contract INDHandler is Test {
         revokeKeys = _revokeKeys;
     }
 
-    // -------- helpers --------
-
     function _boundIdx(uint256 x, uint256 n) internal pure returns (uint256) {
         return n == 0 ? 0 : x % n;
     }
@@ -55,18 +54,12 @@ contract INDHandler is Test {
         return o;
     }
 
-    // -------- actions (fuzzed) --------
-
-    // forge-lint: disable-next-line(mixed-case-function)
-
-    function act_warp(uint256 secs) external {
+    function actWarp(uint256 secs) external {
         uint256 delta = bound(secs, 0, 3 days);
         vm.warp(block.timestamp + delta);
     }
 
-    // forge-lint: disable-next-line(mixed-case-function)
-
-    function act_activate(uint256 ownerSeed) external {
+    function actActivate(uint256 ownerSeed) external {
         uint256 i = _boundIdx(ownerSeed, owners.length);
         address o = owners[i];
         if (reg.isInitialized(o)) return;
@@ -89,6 +82,7 @@ contract INDHandler is Test {
         uint256 amt = bound(amtSeed, 1, spendable);
 
         vm.prank(from);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(to, amt));
     }
 
@@ -104,14 +98,13 @@ contract INDHandler is Test {
         if (spendable == 0) return;
 
         uint256 amt = bound(amtSeed, 1, spendable);
-        uint64 wait = uint64(bound(waitSeed, ind.MIN_WAIT_SECONDS(), ind.MIN_WAIT_SECONDS() + 3 days));
+        uint64 waitSeconds = uint64(bound(waitSeed, ind.MIN_WAIT_SECONDS(), ind.MIN_WAIT_SECONDS() + 3 days));
 
         vm.prank(from);
-        ind.transferWithInheritance(to, amt, wait, bytes32(0));
+        ind.transferWithInheritance(to, amt, waitSeconds, bytes32(0));
     }
 
-    function actReduce(uint256 ownerSeed, uint256 recipientSeed, uint256 lotSeed, uint256 newUnlockSeed) external {
-        uint256 oi = _boundIdx(ownerSeed, owners.length);
+    function actReduce(uint256, uint256 recipientSeed, uint256 lotSeed, uint256 newUnlockSeed) external {
         uint256 ri = _boundIdx(recipientSeed, owners.length);
 
         address recipient = owners[ri];
@@ -123,15 +116,15 @@ contract INDHandler is Test {
         if (lot.amount == 0) return;
         if (block.timestamp >= lot.unlockTime) return;
 
-        // Only the revoke controller of the *logical owner* can reduce
         address ownerLogical = lot.senderOwner;
         if (ownerLogical == address(0)) return;
 
-        // Map ownerLogical -> its revoke caller by searching owners[]
         uint256 ownerIdx = type(uint256).max;
         for (uint256 k = 0; k < owners.length; k++) {
-            if (owners[k] == ownerLogical) ownerIdx = k;
-            break;
+            if (owners[k] == ownerLogical) {
+                ownerIdx = k;
+                break;
+            }
         }
         if (ownerIdx == type(uint256).max) return;
 
@@ -147,7 +140,7 @@ contract INDHandler is Test {
         ind.reduceUnlockTime(recipient, lotIndex, newU);
     }
 
-    function actRevoke(uint256 ownerSeed, uint256 recipientSeed, uint256 lotSeed) external {
+    function actRevoke(uint256, uint256 recipientSeed, uint256 lotSeed) external {
         uint256 ri = _boundIdx(recipientSeed, owners.length);
         address recipient = owners[ri];
 
@@ -164,8 +157,10 @@ contract INDHandler is Test {
 
         uint256 ownerIdx = type(uint256).max;
         for (uint256 k = 0; k < owners.length; k++) {
-            if (owners[k] == ownerLogical) ownerIdx = k;
-            break;
+            if (owners[k] == ownerLogical) {
+                ownerIdx = k;
+                break;
+            }
         }
         if (ownerIdx == type(uint256).max) return;
 
@@ -175,7 +170,6 @@ contract INDHandler is Test {
         ind.revoke(recipient, lotIndex);
     }
 
-    // expose accounts to invariant test
     function allOwners() external view returns (address[] memory) {
         return owners;
     }

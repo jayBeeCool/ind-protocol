@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "../../contracts/interfaces/IINDKeyRegistryLite.sol";
+import {IINDKeyRegistryLite} from "../../contracts/interfaces/IINDKeyRegistryLite.sol";
 
 contract MockINDKeyRegistryLite is IINDKeyRegistryLite {
     mapping(address => bool) private _initialized;

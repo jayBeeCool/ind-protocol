@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "./InheritanceDollar.t.sol";
 
 contract F01_R25_R27_GregorianTrigger is InheritanceDollarTest {

@@ -9,7 +9,9 @@ interface IINDSaleReceiver {
 }
 
 contract INDDepositReceiver {
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
     IINDSaleReceiver public immutable sale;
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
     address public immutable recipient;
 
     event DepositForwarded(address indexed from, address indexed recipient, uint256 ethIn, uint256 indOut);

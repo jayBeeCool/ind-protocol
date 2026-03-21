@@ -44,6 +44,7 @@ contract InheritanceDollarVaultUpgradeableBlock1RegistryTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(bytes4(0xf28dceb3));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(bob, 1 ether);
     }
 

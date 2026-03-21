@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "forge-std/Script.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "../contracts/InheritanceDollar.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "../contracts/INDSale.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "../contracts/INDOpenDepositReceiver.sol";
 
 contract DeploySepoliaSaleStack is Script {

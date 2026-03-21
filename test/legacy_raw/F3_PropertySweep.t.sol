@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "../../contracts/InheritanceDollarCompat.sol";
 
 contract F3_PropertySweep_Test is Test {
@@ -65,6 +66,7 @@ contract F3_PropertySweep_Test is Test {
 
         // destinatario ancora vivo: facciamo un outgoing firmato recente
         vm.prank(rSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(address(0xD00D), 1);
 
         uint256 lotIndex = ind.getLots(rSk).length - 1;
@@ -97,9 +99,11 @@ contract F3_PropertySweep_Test is Test {
 
         // touch outgoing so inactivity timer starts
         vm.prank(sSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         require(ind.transfer(address(0xD00D), 1));
 
         vm.prank(rSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         require(ind.transfer(address(0xD00D), 1));
 
         // create inheritance lot

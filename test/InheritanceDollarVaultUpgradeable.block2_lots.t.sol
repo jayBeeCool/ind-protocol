@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../contracts/InheritanceDollarVaultUpgradeable.sol";
-import "./mocks/MockINDKeyRegistryLite.sol";
+import {Test} from "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
+import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
 contract Block2LotsTest is Test {
     InheritanceDollarVaultUpgradeable ind;

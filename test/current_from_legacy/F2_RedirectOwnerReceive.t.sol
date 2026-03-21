@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "../../contracts/InheritanceDollarCompat.sol";
 
 contract F2_RedirectOwnerReceive_Test is Test {
@@ -48,6 +49,7 @@ contract F2_RedirectOwnerReceive_Test is Test {
 
         // bob sends to OWNER address, must end up at signing
         vm.prank(bob);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(owner, 10 ether));
 
         assertEq(ind.balanceOf(owner), 0);
@@ -58,7 +60,7 @@ contract F2_RedirectOwnerReceive_Test is Test {
         return keccak256(abi.encodePacked("\x19\x01", ind.DOMAIN_SEPARATOR(), structHash));
     }
 
-    function _sign(uint256 pk, bytes32 digest) internal returns (bytes memory) {
+    function _sign(uint256 pk, bytes32 digest) internal pure returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         return abi.encodePacked(r, s, v);
     }

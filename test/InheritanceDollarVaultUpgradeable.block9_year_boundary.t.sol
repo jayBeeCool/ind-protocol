@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
+import {Gregorian} from "../contracts/lib/Gregorian.sol";
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../contracts/InheritanceDollarVaultUpgradeable.sol";
-import "./mocks/MockINDKeyRegistryLite.sol";
+import {Test} from "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
+import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
 contract YearBoundaryTest is Test {
     InheritanceDollarVaultUpgradeable ind;
@@ -40,6 +41,7 @@ contract YearBoundaryTest is Test {
     function test_average_resets_correctly_on_year_change() external {
         // Vai a 31 dicembre (fine anno)
         uint256 year = 2025;
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 dec31 = Gregorian.yearEndTs(uint16(year)) - 1;
         vm.warp(dec31 - 10 days);
 

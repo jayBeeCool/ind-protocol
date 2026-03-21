@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../contracts/InheritanceDollarVaultUpgradeable.sol";
-import "./mocks/MockINDKeyRegistryLite.sol";
+import {Test} from "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
+import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
 contract InheritanceDollarVaultUpgradeableTest is Test {
     InheritanceDollarVaultUpgradeable internal ind;
@@ -33,7 +33,7 @@ contract InheritanceDollarVaultUpgradeableTest is Test {
         vm.stopPrank();
     }
 
-    function test_init_keeps_name_symbol_decimals_and_max_supply() external {
+    function test_init_keeps_name_symbol_decimals_and_max_supply() external view {
         assertEq(ind.name(), "Inheritance Dollar");
         assertEq(ind.symbol(), "IND");
         assertEq(ind.decimals(), 18);
@@ -54,6 +54,7 @@ contract InheritanceDollarVaultUpgradeableTest is Test {
         ind.mint(alice, 100 ether);
 
         vm.prank(alice);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(bob, 40 ether));
 
         assertEq(ind.unprotectedBalanceOf(alice), 60 ether);
@@ -97,6 +98,7 @@ contract InheritanceDollarVaultUpgradeableTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(InheritanceDollarVaultUpgradeable.InsufficientUnprotectedBalance.selector);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(bob, 50 ether);
 
         assertEq(ind.unprotectedBalanceOf(alice), 40 ether);
@@ -115,9 +117,11 @@ contract InheritanceDollarVaultUpgradeableTest is Test {
 
         vm.prank(bob);
         vm.expectRevert(InheritanceDollarVaultUpgradeable.InsufficientUnprotectedBalance.selector);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transferFrom(alice, carol, 50 ether);
 
         vm.prank(bob);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transferFrom(alice, carol, 30 ether));
 
         assertEq(ind.unprotectedBalanceOf(alice), 0);
@@ -149,7 +153,8 @@ contract InheritanceDollarVaultUpgradeableTest is Test {
         vm.startPrank(alice);
         ind.protect(30 ether);
         ind.unprotect(10 ether);
-        ind.transfer(bob, 20 ether);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        assertTrue(ind.transfer(bob, 20 ether));
         vm.stopPrank();
 
         assertEq(ind.totalSupply(), ts0);

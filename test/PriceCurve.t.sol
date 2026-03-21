@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "../contracts/lib/PriceCurve.sol";
+import {Test} from "forge-std/Test.sol";
+import {PriceCurve} from "../contracts/lib/PriceCurve.sol";
 
 contract PriceCurveHarness {
     function priceAtSupply(uint256 supplyWei) external pure returns (uint256) {
@@ -28,12 +28,12 @@ contract PriceCurveTest is Test {
         h = new PriceCurveHarness();
     }
 
-    function test_priceAtSupply_zero_isZero() public {
+    function test_priceAtSupply_zero_isZero() public view {
         uint256 p = h.priceAtSupply(0);
         assertEq(p, 0);
     }
 
-    function test_priceAtSupply_10pct_matchesTarget() public {
+    function test_priceAtSupply_10pct_matchesTarget() public view {
         uint256 supply10pct = 10_000_000_000e18; // 10%
         uint256 p = h.priceAtSupply(supply10pct);
 
@@ -41,22 +41,22 @@ contract PriceCurveTest is Test {
         assertApproxEqRel(p, 200_000_000_000, 1e14); // 0.01%
     }
 
-    function test_costToMint_zeroAmount_isZero() public {
+    function test_costToMint_zeroAmount_isZero() public view {
         uint256 c = h.costToMint(0, 0);
         assertEq(c, 0);
     }
 
-    function test_costToMint_positive() public {
+    function test_costToMint_positive() public view {
         uint256 c = h.costToMint(0, 1_000e18);
         assertGt(c, 0);
     }
 
-    function test_quoteBuy_zeroEth_isZero() public {
+    function test_quoteBuy_zeroEth_isZero() public view {
         uint256 q = h.quoteBuy(0, 0);
         assertEq(q, 0);
     }
 
-    function test_quoteBuy_and_cost_roundtrip() public {
+    function test_quoteBuy_and_cost_roundtrip() public view {
         uint256 ethIn = 1 ether;
         uint256 amountOut = h.quoteBuy(0, ethIn);
         assertGt(amountOut, 0);
@@ -70,7 +70,7 @@ contract PriceCurveTest is Test {
         }
     }
 
-    function test_price_increases_with_supply() public {
+    function test_price_increases_with_supply() public view {
         uint256 p1 = h.priceAtSupply(1_000_000e18);
         uint256 p2 = h.priceAtSupply(10_000_000_000e18); // 10%
         uint256 p3 = h.priceAtSupply(50_000_000_000e18); // 50%

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../contracts/InheritanceDollarVaultUpgradeable.sol";
-import "./mocks/MockINDKeyRegistryLite.sol";
+import {Test} from "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
+import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
 contract InheritanceDollarVaultUpgradeableBlock8PermitAvgTest is Test {
     InheritanceDollarVaultUpgradeable internal ind;
@@ -66,6 +66,7 @@ contract InheritanceDollarVaultUpgradeableBlock8PermitAvgTest is Test {
         ind.protect(80 ether);
 
         vm.prank(spender);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transferFrom(owner, bob, 20 ether);
 
         assertEq(ind.unprotectedBalanceOf(bob), 20 ether);
@@ -101,6 +102,7 @@ contract InheritanceDollarVaultUpgradeableBlock8PermitAvgTest is Test {
         vm.warp(block.timestamp + 10 days);
 
         vm.prank(owner);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         ind.transfer(bob, 20 ether);
 
         vm.warp(block.timestamp + 10 days);

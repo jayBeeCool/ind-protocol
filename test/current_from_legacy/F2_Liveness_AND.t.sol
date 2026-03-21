@@ -30,8 +30,10 @@ contract F2_Liveness_AND_Test is InheritanceDollarTest {
 
         // touch BOTH clocks at t0 via outgoing tx from both signing keys
         vm.prank(sSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(address(0xD00D), 1));
         vm.prank(rSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(address(0xD00D), 1));
 
         // create a locked lot to recipient signing key
@@ -45,6 +47,7 @@ contract F2_Liveness_AND_Test is InheritanceDollarTest {
         // but refresh spend at year 6 (outgoing tx)
         vm.warp(block.timestamp + (uint256(ind.DEAD_AFTER_SECONDS()) - 365 days)); // ~6y
         vm.prank(rSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(address(0xD00D), 1)); // spend refreshed near 6y
 
         // Now go just beyond 7y from t0: renew likely expired, spend NOT expired => must NOT be dead
@@ -82,8 +85,10 @@ contract F2_Liveness_AND_Test is InheritanceDollarTest {
 
         // Touch spend at t0 for both
         vm.prank(sSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(address(0xD00D), 1));
         vm.prank(rSk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(address(0xD00D), 1));
 
         uint64 wait = uint64(ind.MIN_WAIT_SECONDS());

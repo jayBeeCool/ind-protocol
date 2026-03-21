@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "../contracts/INDReceiverV2.sol";
-import "../contracts/INDReceiverV3.sol";
-import "../contracts/INDReceiverV4.sol";
+import {Test} from "forge-std/Test.sol";
+import {INDReceiverV2} from "../contracts/INDReceiverV2.sol";
+import {INDReceiverV3} from "../contracts/INDReceiverV3.sol";
+import {INDReceiverV4} from "../contracts/INDReceiverV4.sol";
 
 contract MockSale {
     enum Method {

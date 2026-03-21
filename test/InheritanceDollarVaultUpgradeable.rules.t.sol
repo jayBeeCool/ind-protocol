@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "forge-std/Test.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "../contracts/InheritanceDollarVaultUpgradeable.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "./mocks/MockINDKeyRegistryLite.sol";
 
 contract InheritanceDollarVaultUpgradeableRulesTest is Test {

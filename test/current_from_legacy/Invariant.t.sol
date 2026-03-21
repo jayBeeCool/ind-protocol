@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "../../contracts/InheritanceDollarCompat.sol";
 
 contract InvariantTest is Test {
@@ -29,7 +30,7 @@ contract InvariantTest is Test {
         targetContract(address(ind));
     }
 
-    function invariant_balance_split_correct() public {
+    function invariant_balance_split_correct() public view {
         uint256 balA = ind.balanceOf(alice);
         uint256 lockedA = ind.lockedBalanceOf(alice);
         uint256 spendA = ind.spendableBalanceOf(alice);
@@ -51,6 +52,7 @@ contract InvariantTest is Test {
         bool initialized = reg.isInitialized(bob);
         if (spendable > 0 && !initialized) {
             vm.prank(bob);
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             assertTrue(ind.transfer(carl, 1 ether));
         }
 
@@ -58,7 +60,7 @@ contract InvariantTest is Test {
         assertTrue(headAfter >= headBefore);
     }
 
-    function invariant_total_supply_nonzero() public {
+    function invariant_total_supply_nonzero() public view {
         assertTrue(ind.totalSupply() > 0);
     }
 }

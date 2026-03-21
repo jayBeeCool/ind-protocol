@@ -6,6 +6,7 @@ interface IINDSaleV2 {
 }
 
 contract INDReceiverV2 {
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
     IINDSaleV2 public immutable sale;
 
     error ZeroValue();

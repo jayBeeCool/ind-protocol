@@ -46,6 +46,7 @@ contract F2_Advanced_Test is Test {
 
         vm.prank(signing);
         // raw addresses are allowed (ERC20-compatible); no revert expected
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(raw, 1 ether));
     }
 
@@ -54,6 +55,7 @@ contract F2_Advanced_Test is Test {
         ind.mint(signing, 2 ether);
 
         vm.prank(signing);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(owner, 1 ether)); // should redirect to signing (self), no owner balance
 
         assertEq(ind.balanceOf(owner), 0);

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./lib/PriceCurve.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {PriceCurve} from "./lib/PriceCurve.sol";
 
 interface IINDSupply {
     function totalSupply() external view returns (uint256);
@@ -20,6 +20,7 @@ contract INDSale is AccessControl, ReentrancyGuard {
     uint64 public constant COMPAT_WAIT_SECONDS = 1 days;
     bytes32 public constant COMPAT_CHARACTERISTIC = bytes32(0);
 
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
     IINDSupply public immutable ind;
 
     event Bought(
@@ -90,6 +91,7 @@ contract INDSale is AccessControl, ReentrancyGuard {
         uint256 ethUsed = PriceCurve.costToMint(currentSupply, outWei);
         uint256 refund = msg.value - ethUsed;
 
+        // forge-lint: disable-next-line(mixed-case-function)
         _mintIND(recipient, outWei);
 
         (bool burnOk,) = ETH_BURN_SINK.call{value: ethUsed}("");
@@ -103,6 +105,7 @@ contract INDSale is AccessControl, ReentrancyGuard {
         emit Bought(msg.sender, refundTo, recipient, msg.value, ethUsed, refund, outWei);
     }
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function _mintIND(address recipient, uint256 amountWei) internal {
         // Preferred modern path: mint(address,uint256)
         {

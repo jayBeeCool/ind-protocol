@@ -3,9 +3,8 @@ pragma solidity ^0.8.24;
 import {InheritanceDollar} from "../../contracts/InheritanceDollarCompat.sol";
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import "../../contracts/InheritanceDollarCompat.sol";
-import "../../contracts/INDKeyRegistry.sol";
-import "./Handler.t.sol";
+import {INDKeyRegistry} from "../../contracts/InheritanceDollarCompat.sol";
+import {INDHandler} from "./Handler.t.sol";
 
 contract InvariantHandlerTest is StdInvariant, Test {
     INDKeyRegistry reg;
@@ -56,7 +55,7 @@ contract InvariantHandlerTest is StdInvariant, Test {
         targetContract(address(handler));
     }
 
-    function invariant_balance_split_correct_for_all() public {
+    function invariant_balance_split_correct_for_all() public view {
         address[] memory owners = handler.allOwners();
         address[] memory signings = handler.allSigningKeys();
 
@@ -66,7 +65,7 @@ contract InvariantHandlerTest is StdInvariant, Test {
         }
     }
 
-    function _checkAccount(address a) internal {
+    function _checkAccount(address a) internal view {
         uint256 bal = ind.balanceOf(a);
         uint256 locked = ind.lockedBalanceOf(a);
         uint256 spend = ind.spendableBalanceOf(a);
@@ -83,7 +82,7 @@ contract InvariantHandlerTest is StdInvariant, Test {
         }
     }
 
-    function invariant_total_supply_bounded() public {
+    function invariant_total_supply_bounded() public view {
         assertTrue(ind.totalSupply() <= ind.MAX_SUPPLY());
     }
 }

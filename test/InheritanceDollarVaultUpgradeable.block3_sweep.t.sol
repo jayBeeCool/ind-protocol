@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../contracts/InheritanceDollarVaultUpgradeable.sol";
-import "./mocks/MockINDKeyRegistryLite.sol";
+import {Test} from "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
+import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
 contract InheritanceDollarVaultUpgradeableBlock3SweepTest is Test {
     InheritanceDollarVaultUpgradeable internal ind;
@@ -40,7 +40,8 @@ contract InheritanceDollarVaultUpgradeableBlock3SweepTest is Test {
 
         // inizializza la liveness di Bob
         vm.prank(bob);
-        ind.transfer(admin, 1 ether);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        require(ind.transfer(admin, 1 ether));
     }
 
     function _prepareLotToBob() internal {
@@ -114,7 +115,8 @@ contract InheritanceDollarVaultUpgradeableBlock3SweepTest is Test {
         vm.stopPrank();
 
         vm.prank(dave);
-        ind.transfer(admin, 1 ether);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        require(ind.transfer(admin, 1 ether));
 
         vm.prank(bob);
         ind.setDefaultHeir(dave);

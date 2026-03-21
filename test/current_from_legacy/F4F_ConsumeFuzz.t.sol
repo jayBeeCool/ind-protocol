@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
+// forge-lint: disable-next-line(unaliased-plain-import)
 import "../../contracts/InheritanceDollarCompat.sol";
 
 contract F4F_ConsumeFuzz is Test {
@@ -70,6 +71,7 @@ contract F4F_ConsumeFuzz is Test {
             vm.prank(bob);
             vm.expectRevert(bytes("insufficient-spendable"));
             // forge-lint: disable-next-line(erc20-unchecked-transfer)
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             ind.transfer(carl, spendAmt);
         }
 
@@ -86,6 +88,7 @@ contract F4F_ConsumeFuzz is Test {
 
         if (toSpend > 0) {
             vm.prank(bob);
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             assertTrue(ind.transfer(carl, toSpend));
         }
 

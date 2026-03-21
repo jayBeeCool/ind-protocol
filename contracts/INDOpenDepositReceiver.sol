@@ -6,6 +6,7 @@ interface IINDSale {
 }
 
 contract INDOpenDepositReceiver {
+    // forge-lint: disable-next-line(screaming-snake-case-immutable)
     IINDSale public immutable sale;
 
     error ZeroValue();
