@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../contracts/InheritanceDollarVaultUpgradeable.sol";
-import "./mocks/MockINDKeyRegistryLite.sol";
+import {Test} from "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
+import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
 contract InheritanceDollarVaultUpgradeableBlock1RegistryTest is Test {
     InheritanceDollarVaultUpgradeable internal ind;
@@ -57,7 +57,7 @@ contract InheritanceDollarVaultUpgradeableBlock1RegistryTest is Test {
 
     function test_owner_disabled_reverts_transferWithInheritance() external {
         vm.prank(alice);
-        ind.protect(10 ether);
+        assertTrue(ind.protect(10 ether));
 
         reg.setOwnerKeys(alice, signing);
 
@@ -78,7 +78,8 @@ contract InheritanceDollarVaultUpgradeableBlock1RegistryTest is Test {
         reg.setOwnerKeys(carol, signing);
 
         vm.prank(alice);
-        ind.transfer(carol, 5 ether);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        assertTrue(ind.transfer(carol, 5 ether));
 
         assertEq(ind.balanceOf(carol), 0);
         assertEq(ind.balanceOf(signing), 5 ether);
@@ -98,10 +99,10 @@ contract InheritanceDollarVaultUpgradeableBlock1RegistryTest is Test {
         reg.setOwnerKeys(carol, signing);
 
         vm.prank(alice);
-        ind.protect(20 ether);
+        assertTrue(ind.protect(20 ether));
 
         vm.prank(alice);
-        ind.transferWithInheritance(carol, 8 ether, uint64(1 days), bytes32(0));
+        assertTrue(ind.transferWithInheritance(carol, 8 ether, uint64(1 days), bytes32(0)));
 
         assertEq(ind.protectedBalanceOf(carol), 0);
         assertEq(ind.protectedBalanceOf(signing), 8 ether);
@@ -117,7 +118,8 @@ contract InheritanceDollarVaultUpgradeableBlock1RegistryTest is Test {
 
         vm.warp(block.timestamp + 10);
         vm.prank(signing);
-        ind.transfer(bob, 1 ether);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        assertTrue(ind.transfer(bob, 1 ether));
 
         uint64 afterTs = ind.lastInteractionOf(alice);
         assertGt(afterTs, beforeTs);
