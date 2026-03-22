@@ -1,0 +1,37 @@
+
+╭----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------╮
+| Name                 | Type                                                                  | Slot | Offset | Bytes | Contract                                                                          |
++==========================================================================================================================================================================================================+
+| _nameCustom          | string                                                                | 0    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _symbolCustom        | string                                                                | 1    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _totalSupplyCustom   | uint256                                                               | 2    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| maxSupply            | uint256                                                               | 3    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| registry             | contract IINDKeyRegistryLite                                          | 4    | 0      | 20    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _unprotectedBalances | mapping(address => uint256)                                           | 5    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _lots                | mapping(address => struct InheritanceDollarVaultUpgradeable.Lot[])    | 6    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _head                | mapping(address => uint256)                                           | 7    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _allowances          | mapping(address => mapping(address => uint256))                       | 8    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _lastSignedOutTs     | mapping(address => uint64)                                            | 9    | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _lastRenewTs         | mapping(address => uint64)                                            | 10   | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _defaultHeir         | mapping(address => address)                                           | 11   | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _nonces              | mapping(address => uint256)                                           | 12   | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _transferNonces      | mapping(address => uint256)                                           | 13   | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _avg                 | mapping(address => struct InheritanceDollarVaultUpgradeable.AvgState) | 14   | 0      | 32    | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+|----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------|
+| _gap                 | uint256[46]                                                           | 15   | 0      | 1472  | contracts/InheritanceDollarVaultUpgradeable.sol:InheritanceDollarVaultUpgradeable |
+╰----------------------+-----------------------------------------------------------------------+------+--------+-------+-----------------------------------------------------------------------------------╯
+
