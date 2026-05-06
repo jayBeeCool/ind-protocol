@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {InheritanceDollarVaultUpgradeableV2} from "../contracts/InheritanceDollarVaultUpgradeableV2.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
 import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
 contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
-    InheritanceDollarVaultUpgradeableV2 internal ind;
+    InheritanceDollarVaultUpgradeable internal ind;
     MockINDKeyRegistryLite internal reg;
 
     address internal admin = address(0xA11CE);
@@ -20,13 +20,13 @@ contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeableV2 impl = new InheritanceDollarVaultUpgradeableV2();
+        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
-            abi.encodeCall(InheritanceDollarVaultUpgradeableV2.initialize, (admin, MAX_SUPPLY, address(reg)));
+            abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-        ind = InheritanceDollarVaultUpgradeableV2(address(proxy));
+        ind = InheritanceDollarVaultUpgradeable(address(proxy));
 
         vm.startPrank(admin);
         ind.grantRole(ind.MINTER_ROLE(), sale);
@@ -48,11 +48,11 @@ contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
 
         assertTrue(ind.protect(2 ether));
 
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), bytes32("LONG")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), keccak256("LONG")));
 
         vm.warp(block.timestamp + 1 hours);
 
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), bytes32("SHORT")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), keccak256("SHORT")));
 
         vm.stopPrank();
 
@@ -63,7 +63,7 @@ contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
         assertEq(ind.spendableBalanceOf(bob), 1 ether);
 
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), bytes32("BOB_SPENDS_SHORT")));
+        assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), keccak256("BOB_SPENDS_SHORT")));
 
         assertEq(ind.protectedBalanceOf(bob), 1 ether);
         assertEq(ind.protectedBalanceOf(carol), 1 ether);
@@ -81,7 +81,7 @@ contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
         vm.startPrank(alice);
 
         assertTrue(ind.protect(1 ether));
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), bytes32("LONG")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), keccak256("LONG")));
 
         vm.stopPrank();
 
@@ -96,7 +96,7 @@ contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
         assertEq(ind.spendableBalanceOf(bob), 1 ether);
 
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), bytes32("BOB_SPENDS_SELF_PROTECT")));
+        assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), keccak256("BOB_SPENDS_SELF_PROTECT")));
 
         assertEq(ind.protectedBalanceOf(bob), 1 ether);
         assertEq(ind.protectedBalanceOf(carol), 1 ether);

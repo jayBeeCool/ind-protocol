@@ -325,7 +325,14 @@ contract InheritanceDollarVaultUpgradeable is
         uint256 len = src.length;
         for (uint256 i = h; i < len; i++) {
             if (src[i].amount == 0) continue;
+
+            if (_lotBucketId[msg.sender][i + 1] != 0) {
+                _detachLotFromBucket(msg.sender, i, src[i].amount);
+            }
+
+            uint256 newLotIndex = _lots[signingKey].length;
             _lots[signingKey].push(src[i]);
+            _attachLotToBucket(signingKey, newLotIndex);
             src[i].amount = 0;
         }
         _head[msg.sender] = len;
@@ -370,7 +377,14 @@ contract InheritanceDollarVaultUpgradeable is
         uint256 len = src.length;
         for (uint256 i = h; i < len; i++) {
             if (src[i].amount == 0) continue;
+
+            if (_lotBucketId[oldSigning][i + 1] != 0) {
+                _detachLotFromBucket(oldSigning, i, src[i].amount);
+            }
+
+            uint256 newLotIndex = _lots[newSigning].length;
             _lots[newSigning].push(src[i]);
+            _attachLotToBucket(newSigning, newLotIndex);
             src[i].amount = 0;
         }
         _head[oldSigning] = len;
@@ -503,6 +517,7 @@ contract InheritanceDollarVaultUpgradeable is
 
         _unprotectedBalances[sender] -= amount;
 
+        uint256 lotIndex = _lots[sender].length;
         _lots[sender].push(
             Lot({
                 senderOwner: address(0),
@@ -511,6 +526,7 @@ contract InheritanceDollarVaultUpgradeable is
                 minUnlockTime: uint64(block.timestamp)
             })
         );
+        _attachLotToBucket(sender, lotIndex);
 
         _touchActive(sender);
         _avgSetBalance(sender);
@@ -586,11 +602,17 @@ contract InheritanceDollarVaultUpgradeable is
         if (newUnlockTime < lot.minUnlockTime) revert InheritanceWaitTooShort();
         if (newUnlockTime >= lot.unlockTime) revert InheritanceWaitTooLong();
 
+        uint256 bucketAmount = lot.amount;
+        if (_lotBucketId[recipient][lotIndex + 1] != 0) {
+            _detachLotFromBucket(recipient, lotIndex, bucketAmount);
+        }
+
         address senderOwner = lot.senderOwner;
         address rk = senderOwner == address(0) ? address(0) : registry.revokeKeyOf(senderOwner);
         if (rk == address(0) || msg.sender != rk) revert NotRevoke();
 
         lot.unlockTime = newUnlockTime;
+        _attachLotToBucket(recipient, lotIndex);
         emit UnlockTimeReduced(senderOwner, recipient, lotIndex, newUnlockTime);
         return true;
     }
@@ -642,19 +664,23 @@ contract InheritanceDollarVaultUpgradeable is
         _touchActive(from);
 
         if (_isDead(targetOwner)) {
+            uint256 refundLotIndex = _lots[from].length;
             _lots[from].push(Lot({senderOwner: address(0), amount: amount, unlockTime: nowTs, minUnlockTime: nowTs}));
+            _attachLotToBucket(from, refundLotIndex);
             return true;
         }
 
         uint64 unlockTime = nowTs + waitSeconds;
         uint64 minUnlockTime = nowTs + MIN_INHERITANCE_WAIT;
 
+        uint256 recipientLotIndex = _lots[rawTarget].length;
         _lots[rawTarget].push(
             Lot({senderOwner: fromOwner, amount: amount, unlockTime: unlockTime, minUnlockTime: minUnlockTime})
         );
+        _attachLotToBucket(rawTarget, recipientLotIndex);
 
         emit TransferWithInheritance(
-            from, rawTarget, amount, unlockTime, minUnlockTime, characteristic, _lots[rawTarget].length - 1
+            from, rawTarget, amount, unlockTime, minUnlockTime, characteristic, recipientLotIndex
         );
 
         return true;
@@ -672,6 +698,10 @@ contract InheritanceDollarVaultUpgradeable is
         address senderOwner = lot.senderOwner;
         address rk = senderOwner == address(0) ? address(0) : registry.revokeKeyOf(senderOwner);
         if (rk == address(0) || msg.sender != rk) revert NotRevoke();
+
+        if (_lotBucketId[recipient][lotIndex + 1] != 0) {
+            _detachLotFromBucket(recipient, lotIndex, amount);
+        }
 
         lot.amount = 0;
         _advanceHead(recipient);
@@ -695,6 +725,10 @@ contract InheritanceDollarVaultUpgradeable is
         uint256 amount = lot.amount;
         if (amount == 0) revert InsufficientProtectedBalance();
         if (block.timestamp < lot.unlockTime) revert InsufficientProtectedBalance();
+
+        if (_lotBucketId[recipient][lotIndex + 1] != 0) {
+            _detachLotFromBucket(recipient, lotIndex, amount);
+        }
 
         lot.amount = 0;
 
@@ -736,7 +770,13 @@ contract InheritanceDollarVaultUpgradeable is
             }
             if (block.timestamp < lot.unlockTime) break;
 
-            swept += lot.amount;
+            uint256 sweptAmount = lot.amount;
+            swept += sweptAmount;
+
+            if (_lotBucketId[account][i + 1] != 0) {
+                _detachLotFromBucket(account, i, sweptAmount);
+            }
+
             lot.amount = 0;
             unchecked {
                 ++i;
@@ -775,23 +815,222 @@ contract InheritanceDollarVaultUpgradeable is
         return ownerLogical;
     }
 
-    function _resolveInboundTarget(address to) internal returns (address resolved, bool burnIt) {
-        if (to == address(0)) revert ZeroAddress();
 
-        resolved = _resolveRecipientRaw(to);
-        address ownerLogical = _logicalOwnerOf(resolved);
 
-        _autoSweepIfDead(ownerLogical);
+    function _bucketKey(uint64 ts) internal pure returns (uint64) {
+        // floor-to-hour is intentional: bucket key = start of the 1h window
+        // forge-lint: disable-next-line(divide-before-multiply)
+        return uint64((uint256(ts) / 1 hours) * 1 hours);
+    }
 
-        if (_isDead(ownerLogical)) {
-            address target = _inheritanceTarget(ownerLogical);
-            if (target == address(0)) {
-                return (address(0), true);
-            }
-            return (target, false);
+    function _ensureBucket(address user, uint64 key) internal returns (uint256 id) {
+        id = _bucketIndex[user][key];
+        if (id != 0) return id;
+
+        id = ++_bucketCount[user];
+        _bucketIndex[user][key] = id;
+
+        BucketNode storage b = _buckets[user][id];
+        b.unlockTime = key;
+
+        uint256 head = _bucketHead[user];
+        if (head == 0) {
+            _bucketHead[user] = id;
+            _bucketTail[user] = id;
+            return id;
         }
 
-        return (resolved, false);
+        uint256 tail = _bucketTail[user];
+        if (_buckets[user][tail].unlockTime < key) {
+            b.prevBucket = tail;
+            _buckets[user][tail].nextBucket = id;
+            _bucketTail[user] = id;
+            return id;
+        }
+
+        if (key < _buckets[user][head].unlockTime) {
+            b.nextBucket = head;
+            _buckets[user][head].prevBucket = id;
+            _bucketHead[user] = id;
+            return id;
+        }
+
+        uint256 cur = head;
+        uint256 prev = 0;
+
+        while (cur != 0 && _buckets[user][cur].unlockTime < key) {
+            prev = cur;
+            cur = _buckets[user][cur].nextBucket;
+        }
+
+        b.prevBucket = prev;
+        b.nextBucket = cur;
+
+        if (prev == 0) {
+            _bucketHead[user] = id;
+        } else {
+            _buckets[user][prev].nextBucket = id;
+        }
+
+        if (cur == 0) {
+            _bucketTail[user] = id;
+        } else {
+            _buckets[user][cur].prevBucket = id;
+        }
+    }
+
+    function _unlinkBucket(address user, uint256 id) internal {
+        if (id == 0) return;
+
+        BucketNode storage b = _buckets[user][id];
+        if (b.total != 0) return;
+
+        uint64 key = b.unlockTime;
+        uint256 prev = b.prevBucket;
+        uint256 next = b.nextBucket;
+
+        if (prev == 0) {
+            _bucketHead[user] = next;
+        } else {
+            _buckets[user][prev].nextBucket = next;
+        }
+
+        if (next == 0) {
+            _bucketTail[user] = prev;
+        } else {
+            _buckets[user][next].prevBucket = prev;
+        }
+
+        delete _bucketIndex[user][key];
+        delete _buckets[user][id];
+    }
+
+    function _attachLotToBucket(address user, uint256 lotIndex) internal {
+        Lot storage lot = _lots[user][lotIndex];
+        if (lot.amount == 0) return;
+
+        uint256 lotNode = lotIndex + 1;
+        if (_lotBucketId[user][lotNode] != 0) return;
+
+        uint64 key = _bucketKey(lot.unlockTime);
+        uint256 id = _ensureBucket(user, key);
+
+        BucketNode storage b = _buckets[user][id];
+
+        uint256 oldLast = b.lastLotNode;
+        if (oldLast == 0) {
+            b.firstLotNode = lotNode;
+            b.lastLotNode = lotNode;
+        } else {
+            _nextLotNode[user][oldLast] = lotNode;
+            _prevLotNode[user][lotNode] = oldLast;
+            b.lastLotNode = lotNode;
+        }
+
+        _lotBucketId[user][lotNode] = id;
+        b.total += lot.amount;
+    }
+
+    function _decreaseBucketTotal(address user, uint256 bucketId, uint256 amount) internal {
+        if (bucketId == 0 || amount == 0) return;
+
+        BucketNode storage b = _buckets[user][bucketId];
+        if (amount >= b.total) {
+            b.total = 0;
+        } else {
+            b.total -= amount;
+        }
+
+        if (b.total == 0) {
+            _unlinkBucket(user, bucketId);
+        }
+    }
+
+    function _detachLotFromBucket(address user, uint256 lotIndex, uint256 amount) internal {
+        uint256 lotNode = lotIndex + 1;
+        uint256 bucketId = _lotBucketId[user][lotNode];
+        if (bucketId == 0) return;
+
+        BucketNode storage b = _buckets[user][bucketId];
+
+        uint256 prev = _prevLotNode[user][lotNode];
+        uint256 next = _nextLotNode[user][lotNode];
+
+        if (prev == 0) {
+            b.firstLotNode = next;
+        } else {
+            _nextLotNode[user][prev] = next;
+        }
+
+        if (next == 0) {
+            b.lastLotNode = prev;
+        } else {
+            _prevLotNode[user][next] = prev;
+        }
+
+        delete _nextLotNode[user][lotNode];
+        delete _prevLotNode[user][lotNode];
+        delete _lotBucketId[user][lotNode];
+
+        _decreaseBucketTotal(user, bucketId, amount);
+    }
+
+
+
+
+    function _consumeFromBuckets(address user, uint256 amount) internal {
+        uint256 remaining = amount;
+        uint256 bucketId = _bucketHead[user];
+
+        while (bucketId != 0 && remaining > 0) {
+            BucketNode storage b = _buckets[user][bucketId];
+
+            if (block.timestamp < b.unlockTime) break;
+
+            uint256 nextBucket = b.nextBucket;
+            uint256 lotNode = b.firstLotNode;
+            bool consumedSomething = false;
+
+            while (lotNode != 0 && remaining > 0) {
+                uint256 nextLotNode = _nextLotNode[user][lotNode];
+                uint256 lotIndex = lotNode - 1;
+                Lot storage lot = _lots[user][lotIndex];
+
+                if (lot.amount == 0) {
+                    _detachLotFromBucket(user, lotIndex, 0);
+                    lotNode = nextLotNode;
+                    continue;
+                }
+
+                if (block.timestamp < lot.unlockTime) {
+                    lotNode = nextLotNode;
+                    continue;
+                }
+
+                consumedSomething = true;
+
+                if (lot.amount <= remaining) {
+                    uint256 consumed = lot.amount;
+                    remaining -= consumed;
+                    lot.amount = 0;
+                    _detachLotFromBucket(user, lotIndex, consumed);
+                } else {
+                    lot.amount -= remaining;
+                    _decreaseBucketTotal(user, bucketId, remaining);
+                    remaining = 0;
+                }
+
+                lotNode = nextLotNode;
+            }
+
+            if (remaining == 0) break;
+
+            bucketId = nextBucket;
+
+            if (!consumedSomething) break;
+        }
+
+        if (remaining > 0) revert InsufficientProtectedBalance();
     }
 
     function _advanceHead(address user) internal {
@@ -806,30 +1045,8 @@ contract InheritanceDollarVaultUpgradeable is
     }
 
     function _consumeSpendableLots(address user, uint256 amount) internal {
-        uint256 remaining = amount;
-        uint256 i = _head[user];
-        Lot[] storage l = _lots[user];
-
-        while (remaining > 0 && i < l.length) {
-            Lot storage lot = l[i];
-
-            if (block.timestamp < lot.unlockTime) break;
-
-            if (lot.amount <= remaining) {
-                remaining -= lot.amount;
-                lot.amount = 0;
-                unchecked {
-                    ++i;
-                }
-            } else {
-                lot.amount -= remaining;
-                remaining = 0;
-            }
-        }
-
-        if (remaining > 0) revert InsufficientProtectedBalance();
-
-        _head[user] = i;
+        _consumeFromBuckets(user, amount);
+        _advanceHead(user);
     }
 
     function _resolveRecipientRaw(address to) internal view returns (address) {
@@ -857,14 +1074,6 @@ contract InheritanceDollarVaultUpgradeable is
         emit Transfer(from, to, amount);
     }
 
-    function _burnFromUnprotected(address from, uint256 amount) internal {
-        if (_unprotectedBalances[from] < amount) revert InsufficientUnprotectedBalance();
-
-        _unprotectedBalances[from] -= amount;
-        _totalSupplyCustom -= amount;
-
-        emit Transfer(from, address(0), amount);
-    }
 
     function _avgAccumulate(address actor) internal {
         address owner = _logicalOwnerOf(actor);
@@ -926,6 +1135,9 @@ contract InheritanceDollarVaultUpgradeable is
 
         st.lastBal = balNow;
     }
+
+
+
 
     function debugAvg(address user)
         external
@@ -1018,5 +1230,27 @@ contract InheritanceDollarVaultUpgradeable is
         return uint64(shifted);
     }
 
-    uint256[46] private _gap;
+
+    // ===================== V2 BUCKET SYSTEM, APPEND-ONLY STORAGE =====================
+
+    struct BucketNode {
+        uint256 total;
+        uint64 unlockTime;
+        uint256 firstLotNode;
+        uint256 lastLotNode;
+        uint256 prevBucket;
+        uint256 nextBucket;
+    }
+
+    mapping(address => mapping(uint64 => uint256)) private _bucketIndex;
+    mapping(address => mapping(uint256 => BucketNode)) private _buckets;
+    mapping(address => uint256) private _bucketHead;
+    mapping(address => uint256) private _bucketTail;
+    mapping(address => uint256) private _bucketCount;
+    mapping(address => mapping(uint256 => uint256)) private _nextLotNode;
+    mapping(address => mapping(uint256 => uint256)) private _prevLotNode;
+    mapping(address => mapping(uint256 => uint256)) private _lotBucketId;
+
+
+    uint256[37] private _gap;
 }

@@ -4,11 +4,11 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
-import {InheritanceDollarVaultUpgradeableV2} from "../contracts/InheritanceDollarVaultUpgradeableV2.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
 import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
-contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
-    InheritanceDollarVaultUpgradeableV2 internal ind;
+contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
+    InheritanceDollarVaultUpgradeable internal ind;
     MockINDKeyRegistryLite internal reg;
 
     address internal admin = address(0xA11CE);
@@ -23,13 +23,13 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeableV2 impl = new InheritanceDollarVaultUpgradeableV2();
+        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
-            abi.encodeCall(InheritanceDollarVaultUpgradeableV2.initialize, (admin, MAX_SUPPLY, address(reg)));
+            abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-        ind = InheritanceDollarVaultUpgradeableV2(address(proxy));
+        ind = InheritanceDollarVaultUpgradeable(address(proxy));
 
         vm.startPrank(admin);
         ind.grantRole(ind.MINTER_ROLE(), sale);
@@ -45,24 +45,25 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
     }
 
     function _assertBucketInvariant(address user) internal view {
-        (
-            uint256 bucketTotal,
-            uint256 linkedLotTotal,
-            uint256 spendable,
-            uint256 locked,
-            uint256 bucketCount
-        ) = ind.bucketDebugTotals(user);
+        InheritanceDollarVaultUpgradeable.Lot[] memory lots = ind.getLots(user);
 
-        uint256 protectedBalance = ind.protectedBalanceOf(user);
+        uint256 protectedFromLots;
+        uint256 spendableFromLots;
+        uint256 lockedFromLots;
 
-        assertEq(bucketTotal, protectedBalance, "bucketTotal != protectedBalance");
-        assertEq(linkedLotTotal, protectedBalance, "linkedLotTotal != protectedBalance");
-        assertEq(spendable, ind.spendableBalanceOf(user), "bucket spendable != public spendable");
-        assertEq(locked, ind.lockedBalanceOf(user), "bucket locked != public locked");
+        for (uint256 i = ind.headOf(user); i < lots.length; i++) {
+            protectedFromLots += lots[i].amount;
 
-        if (protectedBalance == 0) {
-            assertEq(bucketCount, 0, "empty protected but non-empty buckets");
+            if (block.timestamp >= lots[i].unlockTime) {
+                spendableFromLots += lots[i].amount;
+            } else {
+                lockedFromLots += lots[i].amount;
+            }
         }
+
+        assertEq(protectedFromLots, ind.protectedBalanceOf(user), "lots total != protectedBalance");
+        assertEq(spendableFromLots, ind.spendableBalanceOf(user), "lots spendable != public spendable");
+        assertEq(lockedFromLots, ind.lockedBalanceOf(user), "lots locked != public locked");
     }
 
     function _activateAlice() internal {
@@ -74,11 +75,11 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
         vm.startPrank(alice);
 
         assertTrue(ind.protect(2 ether));
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), bytes32("LONG")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), keccak256("LONG")));
 
         vm.warp(block.timestamp + 1 hours);
 
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), bytes32("SHORT")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), keccak256("SHORT")));
 
         vm.stopPrank();
 
@@ -87,7 +88,7 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
         _assertBucketInvariant(bob);
 
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), bytes32("SPEND")));
+        assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), keccak256("SPEND")));
 
         assertEq(ind.protectedBalanceOf(bob), 1 ether);
         assertEq(ind.protectedBalanceOf(carol), 1 ether);
@@ -100,14 +101,14 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
         vm.startPrank(alice);
 
         assertTrue(ind.protect(10 ether));
-        assertTrue(ind.transferWithInheritance(bob, 10 ether, uint64(1 days), bytes32("BOB")));
+        assertTrue(ind.transferWithInheritance(bob, 10 ether, uint64(1 days), keccak256("BOB")));
 
         vm.stopPrank();
 
         vm.warp(block.timestamp + 1 days + 1 seconds);
 
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 4 ether, uint64(1 days), bytes32("SPEND4")));
+        assertTrue(ind.transferWithInheritance(carol, 4 ether, uint64(1 days), keccak256("SPEND4")));
 
         assertEq(ind.spendableBalanceOf(bob), 6 ether);
         assertEq(ind.protectedBalanceOf(bob), 6 ether);
@@ -122,7 +123,7 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
 
         vm.startPrank(signing);
         assertTrue(ind.protect(1 ether));
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), bytes32("LONG")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), keccak256("LONG")));
         vm.stopPrank();
 
         assertEq(ind.protectedBalanceOf(bob), 1 ether);
@@ -143,7 +144,7 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
 
         vm.startPrank(signing);
         assertTrue(ind.protect(1 ether));
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), bytes32("LONG")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), keccak256("LONG")));
         vm.stopPrank();
 
         _assertBucketInvariant(bob);
@@ -156,7 +157,7 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
         _assertBucketInvariant(bob);
 
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), bytes32("SPEND")));
+        assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), keccak256("SPEND")));
 
         assertEq(ind.protectedBalanceOf(bob), 0);
         assertEq(ind.protectedBalanceOf(carol), 1 ether);
@@ -165,63 +166,6 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
         _assertBucketInvariant(carol);
     }
 
-    function test_lazy_migration_from_old_proxy_state_does_not_break_spend() external {
-        MockINDKeyRegistryLite reg2 = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeable oldImpl = new InheritanceDollarVaultUpgradeable();
-
-        bytes memory initData =
-            abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg2)));
-
-        ERC1967Proxy proxy = new ERC1967Proxy(address(oldImpl), initData);
-        InheritanceDollarVaultUpgradeable oldInd = InheritanceDollarVaultUpgradeable(address(proxy));
-
-        vm.startPrank(admin);
-        oldInd.grantRole(oldInd.MINTER_ROLE(), sale);
-        vm.stopPrank();
-
-        vm.prank(sale);
-        oldInd.mint(alice, 10 ether);
-
-        vm.startPrank(alice);
-        assertTrue(oldInd.protect(2 ether));
-        assertTrue(oldInd.transferWithInheritance(bob, 1 ether, uint64(365 days), bytes32("LONG")));
-
-        vm.warp(block.timestamp + 1 hours);
-
-        assertTrue(oldInd.transferWithInheritance(bob, 1 ether, uint64(1 days), bytes32("SHORT")));
-        vm.stopPrank();
-
-        vm.warp(block.timestamp + 1 days + 1 seconds);
-
-        InheritanceDollarVaultUpgradeableV2 newImpl = new InheritanceDollarVaultUpgradeableV2();
-
-        vm.prank(admin);
-        oldInd.upgradeToAndCall(address(newImpl), "");
-
-        InheritanceDollarVaultUpgradeableV2 upgraded = InheritanceDollarVaultUpgradeableV2(address(proxy));
-
-        upgraded.migrateLotsFor(bob, 1);
-
-        vm.prank(bob);
-        assertTrue(upgraded.transferWithInheritance(carol, 1 ether, uint64(1 days), bytes32("SPEND")));
-
-        assertEq(upgraded.protectedBalanceOf(bob), 1 ether);
-        assertEq(upgraded.protectedBalanceOf(carol), 1 ether);
-
-        (
-            uint256 bucketTotal,
-            uint256 linkedLotTotal,
-            uint256 spendable,
-            uint256 locked,
-            uint256 bucketCount
-        ) = upgraded.bucketDebugTotals(bob);
-
-        assertEq(bucketTotal, upgraded.protectedBalanceOf(bob));
-        assertEq(linkedLotTotal, upgraded.protectedBalanceOf(bob));
-        assertEq(spendable, upgraded.spendableBalanceOf(bob));
-        assertEq(locked, upgraded.lockedBalanceOf(bob));
-        assertGt(bucketCount, 0);
-    }
 
     function test_many_buckets_gas_and_consistency() external {
         vm.prank(sale);
@@ -232,7 +176,7 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
 
         vm.startPrank(alice);
         for (uint256 i = 0; i < 50; i++) {
-            assertTrue(ind.transferWithInheritance(bob, 1 ether, _u64(1 days + i * 1 hours), bytes32("BUCKET")));
+            assertTrue(ind.transferWithInheritance(bob, 1 ether, _u64(1 days + i * 1 hours), keccak256("BUCKET")));
         }
         vm.stopPrank();
 
@@ -241,7 +185,7 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
         _assertBucketInvariant(bob);
 
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 50 ether, uint64(1 days), bytes32("SPEND50")));
+        assertTrue(ind.transferWithInheritance(carol, 50 ether, uint64(1 days), keccak256("SPEND50")));
 
         assertEq(ind.protectedBalanceOf(bob), 0);
         assertEq(ind.protectedBalanceOf(carol), 50 ether);
@@ -262,7 +206,7 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
             assertTrue(ind.protect(1 ether));
             _assertBucketInvariant(bob);
 
-            assertTrue(ind.transferWithInheritance(carol, 1 ether, _u64(1 days + i * 1 hours), bytes32("FUZZ")));
+            assertTrue(ind.transferWithInheritance(carol, 1 ether, _u64(1 days + i * 1 hours), keccak256("FUZZ")));
             _assertBucketInvariant(bob);
             _assertBucketInvariant(carol);
         }
@@ -275,7 +219,7 @@ contract InheritanceDollarVaultUpgradeableV2BucketInvariantTest is Test {
 
         vm.startPrank(carol);
         for (uint256 i = 0; i < steps; i++) {
-            assertTrue(ind.transferWithInheritance(alice, 1 ether, uint64(1 days), bytes32("BACK")));
+            assertTrue(ind.transferWithInheritance(alice, 1 ether, uint64(1 days), keccak256("BACK")));
             _assertBucketInvariant(carol);
             _assertBucketInvariant(alice);
         }

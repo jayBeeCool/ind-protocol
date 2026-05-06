@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {InheritanceDollarVaultUpgradeableV2} from "../contracts/InheritanceDollarVaultUpgradeableV2.sol";
+import {InheritanceDollarVaultUpgradeable} from "../contracts/InheritanceDollarVaultUpgradeable.sol";
 import {MockINDKeyRegistryLite} from "./mocks/MockINDKeyRegistryLite.sol";
 
-contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
-    InheritanceDollarVaultUpgradeableV2 internal ind;
+contract InheritanceDollarVaultUpgradeableStressGasTest is Test {
+    InheritanceDollarVaultUpgradeable internal ind;
     MockINDKeyRegistryLite internal reg;
 
     address internal admin = address(0xA11CE);
@@ -21,13 +21,13 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeableV2 impl = new InheritanceDollarVaultUpgradeableV2();
+        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
-            abi.encodeCall(InheritanceDollarVaultUpgradeableV2.initialize, (admin, MAX_SUPPLY, address(reg)));
+            abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-        ind = InheritanceDollarVaultUpgradeableV2(address(proxy));
+        ind = InheritanceDollarVaultUpgradeable(address(proxy));
 
         vm.startPrank(admin);
         ind.grantRole(ind.MINTER_ROLE(), sale);
@@ -43,24 +43,25 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
     }
 
     function _assertBucketInvariant(address user) internal view {
-        (
-            uint256 bucketTotal,
-            uint256 linkedLotTotal,
-            uint256 spendable,
-            uint256 locked,
-            uint256 bucketCount
-        ) = ind.bucketDebugTotals(user);
+        InheritanceDollarVaultUpgradeable.Lot[] memory lots = ind.getLots(user);
 
-        uint256 protectedBalance = ind.protectedBalanceOf(user);
+        uint256 protectedFromLots;
+        uint256 spendableFromLots;
+        uint256 lockedFromLots;
 
-        assertEq(bucketTotal, protectedBalance, "bucketTotal != protectedBalance");
-        assertEq(linkedLotTotal, protectedBalance, "linkedLotTotal != protectedBalance");
-        assertEq(spendable, ind.spendableBalanceOf(user), "spendable mismatch");
-        assertEq(locked, ind.lockedBalanceOf(user), "locked mismatch");
+        for (uint256 i = ind.headOf(user); i < lots.length; i++) {
+            protectedFromLots += lots[i].amount;
 
-        if (protectedBalance == 0) {
-            assertEq(bucketCount, 0, "empty user has buckets");
+            if (block.timestamp >= lots[i].unlockTime) {
+                spendableFromLots += lots[i].amount;
+            } else {
+                lockedFromLots += lots[i].amount;
+            }
         }
+
+        assertEq(protectedFromLots, ind.protectedBalanceOf(user), "lots total != protectedBalance");
+        assertEq(spendableFromLots, ind.spendableBalanceOf(user), "lots spendable != public spendable");
+        assertEq(lockedFromLots, ind.lockedBalanceOf(user), "lots locked != public locked");
     }
 
     function test_stress_250_increasing_buckets_consume_all() external {
@@ -69,7 +70,7 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
         vm.startPrank(alice);
         for (uint256 i = 0; i < 250; i++) {
-            assertTrue(ind.transferWithInheritance(bob, 1 ether, _u64(1 days + i * 1 hours), bytes32("INC")));
+            assertTrue(ind.transferWithInheritance(bob, 1 ether, _u64(1 days + i * 1 hours), keccak256("INC")));
         }
         vm.stopPrank();
 
@@ -79,7 +80,7 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
         uint256 gasBefore = gasleft();
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 250 ether, uint64(1 days), bytes32("SPEND250")));
+        assertTrue(ind.transferWithInheritance(carol, 250 ether, uint64(1 days), keccak256("SPEND250")));
         uint256 gasUsed = gasBefore - gasleft();
 
         emit log_named_uint("gas_consume_250_buckets", gasUsed);
@@ -97,7 +98,7 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
         vm.startPrank(alice);
         for (uint256 i = 80; i > 0; i--) {
-            assertTrue(ind.transferWithInheritance(bob, 1 ether, _u64(1 days + i * 1 hours), bytes32("REV")));
+            assertTrue(ind.transferWithInheritance(bob, 1 ether, _u64(1 days + i * 1 hours), keccak256("REV")));
         }
         vm.stopPrank();
 
@@ -107,7 +108,7 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
         uint256 gasBefore = gasleft();
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 80 ether, uint64(1 days), bytes32("SPEND80")));
+        assertTrue(ind.transferWithInheritance(carol, 80 ether, uint64(1 days), keccak256("SPEND80")));
         uint256 gasUsed = gasBefore - gasleft();
 
         emit log_named_uint("gas_reverse_insert_consume_80", gasUsed);
@@ -125,7 +126,7 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
         vm.startPrank(alice);
         for (uint256 i = 0; i < 100; i++) {
-            assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), bytes32("SAME")));
+            assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), keccak256("SAME")));
         }
         vm.stopPrank();
 
@@ -135,7 +136,7 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
         uint256 gasBefore = gasleft();
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(carol, 40 ether, uint64(1 days), bytes32("PARTIAL")));
+        assertTrue(ind.transferWithInheritance(carol, 40 ether, uint64(1 days), keccak256("PARTIAL")));
         uint256 gasUsedPartial = gasBefore - gasleft();
 
         emit log_named_uint("gas_same_bucket_partial_40_of_100", gasUsedPartial);
@@ -148,7 +149,7 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
         gasBefore = gasleft();
         vm.prank(bob);
-        assertTrue(ind.transferWithInheritance(dave, 60 ether, uint64(1 days), bytes32("REST")));
+        assertTrue(ind.transferWithInheritance(dave, 60 ether, uint64(1 days), keccak256("REST")));
         uint256 gasUsedRest = gasBefore - gasleft();
 
         emit log_named_uint("gas_same_bucket_rest_60", gasUsedRest);
@@ -172,13 +173,13 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
 
         vm.startPrank(alice);
         for (uint256 i = 0; i < 75; i++) {
-            assertTrue(ind.transferWithInheritance(carol, 1 ether, _u64(1 days + i * 1 hours), bytes32("A")));
+            assertTrue(ind.transferWithInheritance(carol, 1 ether, _u64(1 days + i * 1 hours), keccak256("A")));
         }
         vm.stopPrank();
 
         vm.startPrank(bob);
         for (uint256 i = 0; i < 75; i++) {
-            assertTrue(ind.transferWithInheritance(dave, 1 ether, _u64(1 days + i * 2 hours), bytes32("B")));
+            assertTrue(ind.transferWithInheritance(dave, 1 ether, _u64(1 days + i * 2 hours), keccak256("B")));
         }
         vm.stopPrank();
 
@@ -188,10 +189,10 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
         _assertBucketInvariant(dave);
 
         vm.prank(carol);
-        assertTrue(ind.transferWithInheritance(alice, 75 ether, uint64(1 days), bytes32("BACKA")));
+        assertTrue(ind.transferWithInheritance(alice, 75 ether, uint64(1 days), keccak256("BACKA")));
 
         vm.prank(dave);
-        assertTrue(ind.transferWithInheritance(bob, 75 ether, uint64(1 days), bytes32("BACKB")));
+        assertTrue(ind.transferWithInheritance(bob, 75 ether, uint64(1 days), keccak256("BACKB")));
 
         _assertBucketInvariant(alice);
         _assertBucketInvariant(bob);
@@ -206,11 +207,11 @@ contract InheritanceDollarVaultUpgradeableV2StressGasTest is Test {
         vm.startPrank(alice);
 
         uint256 gasBefore = gasleft();
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), bytes32("B1")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), keccak256("B1")));
         uint256 gasFirst = gasBefore - gasleft();
 
         gasBefore = gasleft();
-        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(2 days), bytes32("B2")));
+        assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(2 days), keccak256("B2")));
         uint256 gasAppend = gasBefore - gasleft();
 
         vm.stopPrank();
