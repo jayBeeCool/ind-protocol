@@ -849,7 +849,29 @@ contract InheritanceDollarVaultUpgradeableV2 is
         BucketNode storage b = _buckets[user][id];
         b.unlockTime = key;
 
-        uint256 cur = _bucketHead[user];
+        uint256 head = _bucketHead[user];
+        if (head == 0) {
+            _bucketHead[user] = id;
+            _bucketTail[user] = id;
+            return id;
+        }
+
+        uint256 tail = _bucketTail[user];
+        if (_buckets[user][tail].unlockTime < key) {
+            b.prevBucket = tail;
+            _buckets[user][tail].nextBucket = id;
+            _bucketTail[user] = id;
+            return id;
+        }
+
+        if (key < _buckets[user][head].unlockTime) {
+            b.nextBucket = head;
+            _buckets[user][head].prevBucket = id;
+            _bucketHead[user] = id;
+            return id;
+        }
+
+        uint256 cur = head;
         uint256 prev = 0;
 
         while (cur != 0 && _buckets[user][cur].unlockTime < key) {
