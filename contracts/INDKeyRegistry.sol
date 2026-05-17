@@ -54,6 +54,10 @@ contract INDKeyRegistry is AccessControl {
         return _keys[owner].initialized;
     }
 
+    function isProtectedAware(address account) external view returns (bool) {
+        return _keys[account].initialized;
+    }
+
     function ownerOfSigningKey(address signingKey) external view returns (address) {
         return _ownerOfSigning[signingKey];
     }

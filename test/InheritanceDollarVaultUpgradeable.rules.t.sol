@@ -23,7 +23,10 @@ contract InheritanceDollarVaultUpgradeableRulesTest is Test {
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
+        
+        // Recipients of protected transfers must be explicitly protected-aware.
+        reg.unsafeSetProtectedAwareNoRedirect(bob);
+InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
             abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));

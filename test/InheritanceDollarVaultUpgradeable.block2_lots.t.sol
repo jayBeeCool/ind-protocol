@@ -14,10 +14,17 @@ contract Block2LotsTest is Test {
     address sale = address(2);
     address alice = address(3);
     address bob = address(4);
+    address carol = address(5);
+    address carolHot = address(6);
+    address carolCold = address(7);
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
+        
+        // Recipients of protected transfers must be explicitly protected-aware.
+        reg.unsafeSetProtectedAwareNoRedirect(bob);
+        reg.setOwnerKeys(carol, carolHot, carolCold);
+InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory init = abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, 1e30, address(reg)));
 
@@ -65,13 +72,15 @@ contract Block2LotsTest is Test {
         ind.protect(50 ether);
 
         vm.prank(alice);
-        ind.transferWithInheritance(alice, 20 ether, 1 days, bytes32(0));
+        ind.transferWithInheritance(carol, 20 ether, 1 days, bytes32(0));
 
         vm.warp(block.timestamp + 2 days);
 
-        vm.prank(alice);
+        vm.prank(carolHot);
         ind.transferWithInheritance(bob, 20 ether, 1 days, bytes32(0));
 
+        assertEq(ind.protectedBalanceOf(carolHot), 0);
+        assertEq(ind.protectedBalanceOf(bob), 20 ether);
         assertEq(ind.protectedBalanceOf(alice), 30 ether);
     }
 }

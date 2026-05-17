@@ -16,13 +16,19 @@ contract InheritanceDollarVaultUpgradeableBlock7RevokeTest is Test {
     address internal signing = address(0x1111);
     address internal revokeK = address(0x2222);
     address internal bob = address(0xBBB2);
+    address internal bobHot = address(0xB0B01);
+    address internal bobCold = address(0xB0B02);
     address internal eve = address(0xEEE5);
 
     uint256 internal constant MAX_SUPPLY = 100_000_000_000 ether;
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
+        
+        // Recipients of protected transfers must be explicitly protected-aware.
+        reg.setOwnerKeys(bob, bobHot, bobCold);
+        reg.unsafeSetProtectedAwareNoRedirect(eve);
+InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
             abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));
@@ -51,25 +57,25 @@ contract InheritanceDollarVaultUpgradeableBlock7RevokeTest is Test {
 
     function test_revokeKey_can_revoke_locked_lot_and_refund_to_signingKey() external {
         uint256 beforeSigning = ind.balanceOf(signing);
-        assertEq(ind.protectedBalanceOf(bob), 20 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 20 ether);
 
         vm.prank(revokeK);
-        assertTrue(ind.revoke(bob, 0));
+        assertTrue(ind.revoke(bobHot, 0));
 
-        assertEq(ind.protectedBalanceOf(bob), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 0);
         assertEq(ind.balanceOf(signing), beforeSigning + 20 ether);
     }
 
     function test_owner_cannot_revoke_after_setup() external {
         vm.prank(owner);
         vm.expectRevert(InheritanceDollarVaultUpgradeable.NotRevoke.selector);
-        ind.revoke(bob, 0);
+        ind.revoke(bobHot, 0);
     }
 
     function test_non_revoke_cannot_revoke() external {
         vm.prank(eve);
         vm.expectRevert(InheritanceDollarVaultUpgradeable.NotRevoke.selector);
-        ind.revoke(bob, 0);
+        ind.revoke(bobHot, 0);
     }
 
     function test_cannot_revoke_unlocked_lot() external {
@@ -77,19 +83,19 @@ contract InheritanceDollarVaultUpgradeableBlock7RevokeTest is Test {
 
         vm.prank(revokeK);
         vm.expectRevert(InheritanceDollarVaultUpgradeable.LotUnlocked.selector);
-        ind.revoke(bob, 0);
+        ind.revoke(bobHot, 0);
     }
 
     function test_revoke_advances_head_when_revoking_first_lot() external {
         vm.prank(signing);
         ind.transferWithInheritance(bob, 5 ether, uint64(4 days), bytes32(0));
 
-        assertEq(ind.headOf(bob), 0);
+        assertEq(ind.headOf(bobHot), 0);
 
         vm.prank(revokeK);
-        ind.revoke(bob, 0);
+        ind.revoke(bobHot, 0);
 
-        assertEq(ind.headOf(bob), 1);
-        assertEq(ind.protectedBalanceOf(bob), 5 ether);
+        assertEq(ind.headOf(bobHot), 1);
+        assertEq(ind.protectedBalanceOf(bobHot), 5 ether);
     }
 }

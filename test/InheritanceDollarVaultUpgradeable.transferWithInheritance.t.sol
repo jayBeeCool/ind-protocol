@@ -14,13 +14,22 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
     address internal sale = address(0x5A1E);
     address internal alice = address(0xAAA1);
     address internal bob = address(0xBBB2);
+    address internal bobHot = address(0xB0B01);
+    address internal bobCold = address(0xB0B02);
+
     address internal carol = address(0xCCC3);
+    address internal carolHot = address(0xC0C01);
+    address internal carolCold = address(0xC0C02);
 
     uint256 internal constant MAX_SUPPLY = 100_000_000_000 ether;
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
+        
+        // Recipients of protected transfers must be explicitly protected-aware.
+        reg.setOwnerKeys(bob, bobHot, bobCold);
+        reg.setOwnerKeys(carol, carolHot, carolCold);
+InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
             abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));
@@ -45,8 +54,8 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
         assertEq(ind.unprotectedBalanceOf(alice), 40 ether);
         assertEq(ind.protectedBalanceOf(alice), 20 ether);
 
-        assertEq(ind.unprotectedBalanceOf(bob), 0);
-        assertEq(ind.protectedBalanceOf(bob), 40 ether);
+        assertEq(ind.unprotectedBalanceOf(bobHot), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 40 ether);
     }
 
     function test_transferWithInheritance_reverts_if_only_unprotected_exists() external {
@@ -56,8 +65,8 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
 
         assertEq(ind.unprotectedBalanceOf(alice), 100 ether);
         assertEq(ind.protectedBalanceOf(alice), 0);
-        assertEq(ind.unprotectedBalanceOf(bob), 0);
-        assertEq(ind.protectedBalanceOf(bob), 0);
+        assertEq(ind.unprotectedBalanceOf(bobHot), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 0);
     }
 
     function test_recipient_of_protected_transfer_cannot_bypass_with_erc20_transfer() external {
@@ -66,16 +75,16 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
         ind.transferWithInheritance(bob, 50 ether, 86400, bytes32(0));
         vm.stopPrank();
 
-        assertEq(ind.unprotectedBalanceOf(bob), 0);
-        assertEq(ind.protectedBalanceOf(bob), 50 ether);
+        assertEq(ind.unprotectedBalanceOf(bobHot), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 50 ether);
 
-        vm.prank(bob);
+        vm.prank(bobHot);
         vm.expectRevert(InheritanceDollarVaultUpgradeable.InsufficientUnprotectedBalance.selector);
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        ind.transfer(carol, 1 ether);
+        ind.transfer(carolHot, 1 ether);
 
-        assertEq(ind.unprotectedBalanceOf(carol), 0);
-        assertEq(ind.protectedBalanceOf(carol), 0);
+        assertEq(ind.unprotectedBalanceOf(carolHot), 0);
+        assertEq(ind.protectedBalanceOf(carolHot), 0);
     }
 
     function test_transferWithInheritance_emits_protected_to_protected_only() external {
@@ -87,9 +96,9 @@ contract InheritanceDollarVaultUpgradeableTransferWithInheritanceTest is Test {
 
         assertEq(ind.unprotectedBalanceOf(alice), 75 ether);
         assertEq(ind.protectedBalanceOf(alice), 0);
-        assertEq(ind.unprotectedBalanceOf(bob), 0);
-        assertEq(ind.protectedBalanceOf(bob), 25 ether);
+        assertEq(ind.unprotectedBalanceOf(bobHot), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 25 ether);
         assertEq(ind.unprotectedBalanceOf(alice), 75 ether);
-        assertEq(ind.balanceOf(bob), 25 ether);
+        assertEq(ind.balanceOf(bobHot), 25 ether);
     }
 }

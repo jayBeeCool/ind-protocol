@@ -57,6 +57,10 @@ contract MockINDKeyRegistryLite is IINDKeyRegistryLite {
         return _initialized[owner];
     }
 
+    function isProtectedAware(address account) external view override returns (bool) {
+        return _initialized[account];
+    }
+
     function ownerOfSigningKey(address signingKey) external view override returns (address) {
         return _ownerOfSigning[signingKey];
     }
@@ -68,4 +72,13 @@ contract MockINDKeyRegistryLite is IINDKeyRegistryLite {
     function revokeKeyOf(address owner) external view override returns (address) {
         return _revokeOfOwner[owner];
     }
+
+    // TEST-ONLY: mark account as protected-aware without signing-key redirect.
+    function unsafeSetProtectedAwareNoRedirect(address account) external {
+        _initialized[account] = true;
+        _signingOfOwner[account] = address(0);
+        _revokeOfOwner[account] = address(0);
+        // Intentionally do NOT set _ownerOfSigning[account].
+    }
+
 }

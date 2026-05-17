@@ -15,7 +15,11 @@ contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
     address internal sale = address(0x5A1E);
     address internal alice = address(0xAAA1);
     address internal bob = address(0xBBB2);
+    address internal bobHot = address(0xB0B01);
+    address internal bobCold = address(0xB0B02);
     address internal carol = address(0xCCC3);
+    address internal carolHot = address(0xC0C01);
+    address internal carolCold = address(0xC0C02);
     address internal signing = address(0x1111);
     address internal revokeKey = address(0x2222);
 
@@ -23,7 +27,11 @@ contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
+        
+        // Recipients of protected transfers must be explicitly protected-aware.
+        reg.setOwnerKeys(bob, bobHot, bobCold);
+        reg.setOwnerKeys(carol, carolHot, carolCold);
+InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
             abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));
@@ -85,16 +93,16 @@ contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
 
         vm.warp(block.timestamp + 1 days + 1 seconds);
 
-        _assertBucketInvariant(bob);
+        _assertBucketInvariant(bobHot);
 
-        vm.prank(bob);
+        vm.prank(bobHot);
         assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), keccak256("SPEND")));
 
-        assertEq(ind.protectedBalanceOf(bob), 1 ether);
-        assertEq(ind.protectedBalanceOf(carol), 1 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 1 ether);
+        assertEq(ind.protectedBalanceOf(carolHot), 1 ether);
 
-        _assertBucketInvariant(bob);
-        _assertBucketInvariant(carol);
+        _assertBucketInvariant(bobHot);
+        _assertBucketInvariant(carolHot);
     }
 
     function test_partial_consumption_keeps_bucket_consistent() external {
@@ -107,15 +115,15 @@ contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
 
         vm.warp(block.timestamp + 1 days + 1 seconds);
 
-        vm.prank(bob);
+        vm.prank(bobHot);
         assertTrue(ind.transferWithInheritance(carol, 4 ether, uint64(1 days), keccak256("SPEND4")));
 
-        assertEq(ind.spendableBalanceOf(bob), 6 ether);
-        assertEq(ind.protectedBalanceOf(bob), 6 ether);
-        assertEq(ind.protectedBalanceOf(carol), 4 ether);
+        assertEq(ind.spendableBalanceOf(bobHot), 6 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 6 ether);
+        assertEq(ind.protectedBalanceOf(carolHot), 4 ether);
 
-        _assertBucketInvariant(bob);
-        _assertBucketInvariant(carol);
+        _assertBucketInvariant(bobHot);
+        _assertBucketInvariant(carolHot);
     }
 
     function test_revoke_updates_bucket_correctly() external {
@@ -126,16 +134,16 @@ contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
         assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), keccak256("LONG")));
         vm.stopPrank();
 
-        assertEq(ind.protectedBalanceOf(bob), 1 ether);
-        _assertBucketInvariant(bob);
+        assertEq(ind.protectedBalanceOf(bobHot), 1 ether);
+        _assertBucketInvariant(bobHot);
 
         vm.prank(revokeKey);
-        assertTrue(ind.revoke(bob, 0));
+        assertTrue(ind.revoke(bobHot, 0));
 
-        assertEq(ind.protectedBalanceOf(bob), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 0);
         assertEq(ind.unprotectedBalanceOf(signing), 1_000 ether);
 
-        _assertBucketInvariant(bob);
+        _assertBucketInvariant(bobHot);
         _assertBucketInvariant(signing);
     }
 
@@ -147,23 +155,23 @@ contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
         assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(365 days), keccak256("LONG")));
         vm.stopPrank();
 
-        _assertBucketInvariant(bob);
+        _assertBucketInvariant(bobHot);
 
         vm.prank(revokeKey);
-        assertTrue(ind.reduceUnlockTime(bob, 0, _u64(block.timestamp + 1 days)));
+        assertTrue(ind.reduceUnlockTime(bobHot, 0, _u64(block.timestamp + 1 days)));
 
         vm.warp(block.timestamp + 1 days + 1 seconds);
 
-        _assertBucketInvariant(bob);
+        _assertBucketInvariant(bobHot);
 
-        vm.prank(bob);
+        vm.prank(bobHot);
         assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), keccak256("SPEND")));
 
-        assertEq(ind.protectedBalanceOf(bob), 0);
-        assertEq(ind.protectedBalanceOf(carol), 1 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 0);
+        assertEq(ind.protectedBalanceOf(carolHot), 1 ether);
 
-        _assertBucketInvariant(bob);
-        _assertBucketInvariant(carol);
+        _assertBucketInvariant(bobHot);
+        _assertBucketInvariant(carolHot);
     }
 
     function test_many_buckets_gas_and_consistency() external {
@@ -181,46 +189,46 @@ contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
 
         vm.warp(block.timestamp + 1 days + 50 hours + 1 seconds);
 
-        _assertBucketInvariant(bob);
+        _assertBucketInvariant(bobHot);
 
-        vm.prank(bob);
+        vm.prank(bobHot);
         assertTrue(ind.transferWithInheritance(carol, 50 ether, uint64(1 days), keccak256("SPEND50")));
 
-        assertEq(ind.protectedBalanceOf(bob), 0);
-        assertEq(ind.protectedBalanceOf(carol), 50 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 0);
+        assertEq(ind.protectedBalanceOf(carolHot), 50 ether);
 
-        _assertBucketInvariant(bob);
-        _assertBucketInvariant(carol);
+        _assertBucketInvariant(bobHot);
+        _assertBucketInvariant(carolHot);
     }
 
     function testFuzz_bucket_invariant_after_mixed_operations(uint8 rawSteps) external {
         uint256 steps = 1 + (uint256(rawSteps) % 16);
 
         vm.prank(sale);
-        ind.mint(bob, 100 ether);
+        ind.mint(bobHot, 100 ether);
 
-        vm.startPrank(bob);
+        vm.startPrank(bobHot);
 
         for (uint256 i = 0; i < steps; i++) {
             assertTrue(ind.protect(1 ether));
-            _assertBucketInvariant(bob);
+            _assertBucketInvariant(bobHot);
 
             assertTrue(ind.transferWithInheritance(carol, 1 ether, _u64(1 days + i * 1 hours), keccak256("FUZZ")));
-            _assertBucketInvariant(bob);
-            _assertBucketInvariant(carol);
+            _assertBucketInvariant(bobHot);
+            _assertBucketInvariant(carolHot);
         }
 
         vm.stopPrank();
 
         vm.warp(block.timestamp + 1 days + steps * 1 hours + 1 seconds);
 
-        _assertBucketInvariant(carol);
+        _assertBucketInvariant(carolHot);
 
-        vm.startPrank(carol);
+        vm.startPrank(carolHot);
         for (uint256 i = 0; i < steps; i++) {
-            assertTrue(ind.transferWithInheritance(alice, 1 ether, uint64(1 days), keccak256("BACK")));
-            _assertBucketInvariant(carol);
-            _assertBucketInvariant(alice);
+            assertTrue(ind.transferWithInheritance(bob, 1 ether, uint64(1 days), keccak256("BACK")));
+            _assertBucketInvariant(carolHot);
+            _assertBucketInvariant(bobHot);
         }
         vm.stopPrank();
     }

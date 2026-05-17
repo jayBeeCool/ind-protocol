@@ -14,13 +14,19 @@ contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
     address internal sale = address(0x5A1E);
     address internal alice = address(0xAAA1);
     address internal bob = address(0xBBB2);
+    address internal bobHot = address(0xB0B01);
+    address internal bobCold = address(0xB0B02);
     address internal carol = address(0xCCC3);
 
     uint256 internal constant MAX_SUPPLY = 100_000_000_000 ether;
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
+        
+        // Recipients of protected transfers must be explicitly protected-aware.
+        reg.setOwnerKeys(bob, bobHot, bobCold);
+        reg.unsafeSetProtectedAwareNoRedirect(carol);
+InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
             abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));
@@ -58,14 +64,14 @@ contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
 
         vm.warp(block.timestamp + 1 days + 1 seconds);
 
-        assertEq(ind.protectedBalanceOf(bob), 2 ether);
-        assertEq(ind.lockedBalanceOf(bob), 1 ether);
-        assertEq(ind.spendableBalanceOf(bob), 1 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 2 ether);
+        assertEq(ind.lockedBalanceOf(bobHot), 1 ether);
+        assertEq(ind.spendableBalanceOf(bobHot), 1 ether);
 
-        vm.prank(bob);
+        vm.prank(bobHot);
         assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), keccak256("BOB_SPENDS_SHORT")));
 
-        assertEq(ind.protectedBalanceOf(bob), 1 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 1 ether);
         assertEq(ind.protectedBalanceOf(carol), 1 ether);
     }
 
@@ -88,17 +94,17 @@ contract InheritanceDollarVaultUpgradeableLotOrderReproTest is Test {
         vm.prank(sale);
         ind.mint(bob, 1 ether);
 
-        vm.prank(bob);
+        vm.prank(bobHot);
         assertTrue(ind.protect(1 ether));
 
-        assertEq(ind.protectedBalanceOf(bob), 2 ether);
-        assertEq(ind.lockedBalanceOf(bob), 1 ether);
-        assertEq(ind.spendableBalanceOf(bob), 1 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 2 ether);
+        assertEq(ind.lockedBalanceOf(bobHot), 1 ether);
+        assertEq(ind.spendableBalanceOf(bobHot), 1 ether);
 
-        vm.prank(bob);
+        vm.prank(bobHot);
         assertTrue(ind.transferWithInheritance(carol, 1 ether, uint64(1 days), keccak256("BOB_SPENDS_SELF_PROTECT")));
 
-        assertEq(ind.protectedBalanceOf(bob), 1 ether);
+        assertEq(ind.protectedBalanceOf(bobHot), 1 ether);
         assertEq(ind.protectedBalanceOf(carol), 1 ether);
     }
 }

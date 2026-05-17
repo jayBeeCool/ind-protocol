@@ -14,13 +14,18 @@ contract InheritanceDollarVaultUpgradeableBlock6AutoSweepTest is Test {
     address internal sale = address(0x5A1E);
     address internal alice = address(0xAAA1);
     address internal bob = address(0xBBB2);
+    address internal bobHot = address(0xB0B01);
+    address internal bobCold = address(0xB0B02);
     address internal dave = address(0xDDD4);
 
     uint256 internal constant MAX_SUPPLY = 100_000_000_000 ether;
 
     function setUp() external {
         reg = new MockINDKeyRegistryLite();
-        InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
+        
+        // Recipients of protected transfers must be explicitly protected-aware.
+        reg.setOwnerKeys(bob, bobHot, bobCold);
+InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable();
 
         bytes memory initData =
             abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, MAX_SUPPLY, address(reg)));
@@ -34,11 +39,11 @@ contract InheritanceDollarVaultUpgradeableBlock6AutoSweepTest is Test {
 
         vm.startPrank(sale);
         ind.mint(alice, 100 ether);
-        ind.mint(bob, 1 ether);
+        ind.mint(bobHot, 1 ether);
         vm.stopPrank();
 
         // inizializza la liveness di Bob
-        vm.prank(bob);
+        vm.prank(bobHot);
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
         assertTrue(ind.transfer(admin, 1 ether));
     }
@@ -54,8 +59,8 @@ contract InheritanceDollarVaultUpgradeableBlock6AutoSweepTest is Test {
     function test_autoSweepIfDead_moves_unlocked_lots_to_heir() external {
         _prepareLotToBob();
 
-        vm.prank(bob);
-        ind.setDefaultHeir(dave);
+        vm.prank(bobCold);
+        ind.revokeSetDefaultHeir(bob, dave);
 
         vm.warp(block.timestamp + 1 days + 1);
         uint64 deathTs = ind.deathTimestampOf(bob);
@@ -65,14 +70,14 @@ contract InheritanceDollarVaultUpgradeableBlock6AutoSweepTest is Test {
 
         assertEq(swept, 25 ether);
         assertEq(ind.balanceOf(dave), 25 ether);
-        assertEq(ind.protectedBalanceOf(bob), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 0);
     }
 
     function test_incoming_transfer_to_dead_owner_bounces_back_to_sender_after_auto_sweep() external {
         _prepareLotToBob();
 
-        vm.prank(bob);
-        ind.setDefaultHeir(dave);
+        vm.prank(bobCold);
+        ind.revokeSetDefaultHeir(bob, dave);
 
         vm.warp(block.timestamp + 1 days + 1);
         uint64 deathTs = ind.deathTimestampOf(bob);
@@ -88,8 +93,8 @@ contract InheritanceDollarVaultUpgradeableBlock6AutoSweepTest is Test {
 
         // nuovo invio -> resta al mittente
         assertEq(ind.balanceOf(alice), aliceBefore);
-        assertEq(ind.balanceOf(bob), 0);
-        assertEq(ind.protectedBalanceOf(bob), 0);
+        assertEq(ind.balanceOf(bobHot), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 0);
     }
 
     function test_incoming_transfer_to_dead_owner_with_no_heir_bounces_back_to_sender_and_old_funds_burn() external {
@@ -111,7 +116,7 @@ contract InheritanceDollarVaultUpgradeableBlock6AutoSweepTest is Test {
 
         // nuovo invio -> resta al mittente
         assertEq(ind.balanceOf(alice), aliceBefore);
-        assertEq(ind.balanceOf(bob), 0);
-        assertEq(ind.protectedBalanceOf(bob), 0);
+        assertEq(ind.balanceOf(bobHot), 0);
+        assertEq(ind.protectedBalanceOf(bobHot), 0);
     }
 }

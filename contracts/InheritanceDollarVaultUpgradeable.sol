@@ -1058,13 +1058,10 @@ contract InheritanceDollarVaultUpgradeable is
     function _resolveProtectedRecipientRaw(address to) internal view returns (address) {
         if (to == address(0)) revert ZeroAddress();
 
-        if (registry.isInitialized(to)) {
-            address sk = registry.signingKeyOf(to);
-            if (sk != address(0)) return sk;
-            return to;
-        }
+        if (!registry.isProtectedAware(to)) revert RecipientNotProtectedAware();
 
-        if (to.code.length != 0) revert RecipientNotProtectedAware();
+        address sk = registry.signingKeyOf(to);
+        if (sk != address(0)) return sk;
 
         return to;
     }
