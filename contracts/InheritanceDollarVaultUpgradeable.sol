@@ -103,6 +103,7 @@ contract InheritanceDollarVaultUpgradeable is
     error InheritanceWaitTooShort();
     error InheritanceWaitTooLong();
     error RecipientDead();
+    error RecipientNotProtectedAware();
     error NotRevoke();
     error LotUnlocked();
 
@@ -654,7 +655,7 @@ contract InheritanceDollarVaultUpgradeable is
     ) internal returns (bool) {
         if (to == address(0)) revert ZeroAddress();
 
-        address rawTarget = _resolveRecipientRaw(to);
+        address rawTarget = _resolveProtectedRecipientRaw(to);
         address targetOwner = _logicalOwnerOf(rawTarget);
         address fromOwner = _logicalOwnerOf(from);
 
@@ -815,8 +816,6 @@ contract InheritanceDollarVaultUpgradeable is
         return ownerLogical;
     }
 
-
-
     function _bucketKey(uint64 ts) internal pure returns (uint64) {
         // floor-to-hour is intentional: bucket key = start of the 1h window
         // forge-lint: disable-next-line(divide-before-multiply)
@@ -975,9 +974,6 @@ contract InheritanceDollarVaultUpgradeable is
         _decreaseBucketTotal(user, bucketId, amount);
     }
 
-
-
-
     function _consumeFromBuckets(address user, uint256 amount) internal {
         uint256 remaining = amount;
         uint256 bucketId = _bucketHead[user];
@@ -1059,6 +1055,20 @@ contract InheritanceDollarVaultUpgradeable is
         return to;
     }
 
+    function _resolveProtectedRecipientRaw(address to) internal view returns (address) {
+        if (to == address(0)) revert ZeroAddress();
+
+        if (registry.isInitialized(to)) {
+            address sk = registry.signingKeyOf(to);
+            if (sk != address(0)) return sk;
+            return to;
+        }
+
+        if (to.code.length != 0) revert RecipientNotProtectedAware();
+
+        return to;
+    }
+
     function _logicalOwnerOf(address a) internal view returns (address) {
         address o = registry.ownerOfSigningKey(a);
         if (o != address(0)) return o;
@@ -1073,7 +1083,6 @@ contract InheritanceDollarVaultUpgradeable is
 
         emit Transfer(from, to, amount);
     }
-
 
     function _avgAccumulate(address actor) internal {
         address owner = _logicalOwnerOf(actor);
@@ -1135,9 +1144,6 @@ contract InheritanceDollarVaultUpgradeable is
 
         st.lastBal = balNow;
     }
-
-
-
 
     function debugAvg(address user)
         external
@@ -1230,8 +1236,7 @@ contract InheritanceDollarVaultUpgradeable is
         return uint64(shifted);
     }
 
-
-    // ===================== V2 BUCKET SYSTEM, APPEND-ONLY STORAGE =====================
+    // ===================== canonical BUCKET SYSTEM, APPEND-ONLY STORAGE =====================
 
     struct BucketNode {
         uint256 total;
@@ -1250,7 +1255,6 @@ contract InheritanceDollarVaultUpgradeable is
     mapping(address => mapping(uint256 => uint256)) private _nextLotNode;
     mapping(address => mapping(uint256 => uint256)) private _prevLotNode;
     mapping(address => mapping(uint256 => uint256)) private _lotBucketId;
-
 
     uint256[37] private _gap;
 }

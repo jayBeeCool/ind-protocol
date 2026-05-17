@@ -6,7 +6,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {INDKeyRegistry} from "contracts/INDKeyRegistry.sol";
 import {InheritanceDollarVaultUpgradeable} from "contracts/InheritanceDollarVaultUpgradeable.sol";
 
-contract DeploySepoliaVaultStackV2 is Script {
+contract DeploySepoliaVaultStack is Script {
     function run() external {
         address admin = vm.envAddress("SAFE_ADMIN");
         uint256 maxSupply = vm.envUint("MAX_SUPPLY");
@@ -16,10 +16,8 @@ contract DeploySepoliaVaultStackV2 is Script {
         INDKeyRegistry registry = new INDKeyRegistry(admin);
         InheritanceDollarVaultUpgradeable implementation = new InheritanceDollarVaultUpgradeable();
 
-        bytes memory initData = abi.encodeCall(
-            InheritanceDollarVaultUpgradeable.initialize,
-            (admin, maxSupply, address(registry))
-        );
+        bytes memory initData =
+            abi.encodeCall(InheritanceDollarVaultUpgradeable.initialize, (admin, maxSupply, address(registry)));
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
 

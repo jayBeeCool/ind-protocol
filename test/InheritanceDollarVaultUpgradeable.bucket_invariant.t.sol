@@ -166,7 +166,6 @@ contract InheritanceDollarVaultUpgradeableBucketInvariantTest is Test {
         _assertBucketInvariant(carol);
     }
 
-
     function test_many_buckets_gas_and_consistency() external {
         vm.prank(sale);
         ind.mint(alice, 100 ether);
