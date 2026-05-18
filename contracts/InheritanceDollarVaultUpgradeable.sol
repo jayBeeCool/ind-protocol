@@ -157,6 +157,10 @@ contract InheritanceDollarVaultUpgradeable is
     }
 
     function balanceOf(address account) public view override returns (uint256) {
+        return _unprotectedBalances[account] + spendableBalanceOf(account);
+    }
+
+    function totalBalanceOf(address account) public view returns (uint256) {
         return _unprotectedBalances[account] + protectedBalanceOf(account);
     }
 

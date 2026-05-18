@@ -99,6 +99,6 @@ InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable()
         assertEq(ind.unprotectedBalanceOf(bobHot), 0);
         assertEq(ind.protectedBalanceOf(bobHot), 25 ether);
         assertEq(ind.unprotectedBalanceOf(alice), 75 ether);
-        assertEq(ind.balanceOf(bobHot), 25 ether);
+        assertEq(ind.totalBalanceOf(bobHot), 25 ether);
     }
 }

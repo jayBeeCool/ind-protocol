@@ -64,7 +64,7 @@ InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable()
         assertTrue(ind.transferWithInheritance(bob, 1 ether, maxWait, bytes32(0)));
 
         assertEq(ind.protectedBalanceOf(bob), 1 ether);
-        assertEq(ind.balanceOf(bob), 1 ether);
+        assertEq(ind.totalBalanceOf(bob), 1 ether);
     }
 
     function test_transferWithInheritance_reverts_above_max_gregorian_wait() external {
@@ -97,7 +97,7 @@ InheritanceDollarVaultUpgradeable impl = new InheritanceDollarVaultUpgradeable()
         assertEq(bobAfter, 0);
 
         assertEq(ind.protectedBalanceOf(bob), 5 ether);
-        assertEq(ind.balanceOf(bob), 5 ether);
+        assertEq(ind.totalBalanceOf(bob), 5 ether);
     }
 
     function test_sender_interaction_refreshes_lastInteraction() external {

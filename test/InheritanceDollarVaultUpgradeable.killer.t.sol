@@ -48,8 +48,8 @@ contract InheritanceDollarVaultUpgradeableKillerTest is Test {
         assertTrue(ind.transfer(bob, 20 ether));
         vm.stopPrank();
 
-        assertEq(ind.balanceOf(alice), ind.unprotectedBalanceOf(alice) + ind.protectedBalanceOf(alice));
-        assertEq(ind.balanceOf(bob), ind.unprotectedBalanceOf(bob) + ind.protectedBalanceOf(bob));
+        assertEq(ind.totalBalanceOf(alice), ind.unprotectedBalanceOf(alice) + ind.protectedBalanceOf(alice));
+        assertEq(ind.totalBalanceOf(bob), ind.unprotectedBalanceOf(bob) + ind.protectedBalanceOf(bob));
     }
 
     function test_killer_redirect_protected_inheritance() external {
@@ -107,8 +107,8 @@ contract InheritanceDollarVaultUpgradeableKillerTest is Test {
         assertTrue(ind.transferWithInheritance(carol, 30 ether, uint64(1 days), bytes32(0)));
         vm.stopPrank();
 
-        assertEq(ind.balanceOf(alice), ind.unprotectedBalanceOf(alice) + ind.protectedBalanceOf(alice));
-        assertEq(ind.balanceOf(signing), ind.unprotectedBalanceOf(signing) + ind.protectedBalanceOf(signing));
+        assertEq(ind.totalBalanceOf(alice), ind.unprotectedBalanceOf(alice) + ind.protectedBalanceOf(alice));
+        assertEq(ind.totalBalanceOf(signing), ind.unprotectedBalanceOf(signing) + ind.protectedBalanceOf(signing));
         assertEq(ind.protectedBalanceOf(carol), 0);
         assertGt(ind.protectedBalanceOf(signing), 0);
     }
