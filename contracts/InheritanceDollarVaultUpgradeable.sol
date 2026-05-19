@@ -1059,10 +1059,22 @@ contract InheritanceDollarVaultUpgradeable is
         return to;
     }
 
+    function _isProtectedAwareCompat(address account) internal view returns (bool) {
+        (bool ok, bytes memory data) = address(registry).staticcall(
+            abi.encodeWithSelector(IINDKeyRegistryLite.isProtectedAware.selector, account)
+        );
+
+        if (ok && data.length >= 32) {
+            return abi.decode(data, (bool));
+        }
+
+        return registry.isInitialized(account);
+    }
+
     function _resolveProtectedRecipientRaw(address to) internal view returns (address) {
         if (to == address(0)) revert ZeroAddress();
 
-        if (!registry.isProtectedAware(to)) revert RecipientNotProtectedAware();
+        if (!_isProtectedAwareCompat(to)) revert RecipientNotProtectedAware();
 
         address sk = registry.signingKeyOf(to);
         if (sk != address(0)) return sk;
