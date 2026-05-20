@@ -133,6 +133,11 @@ contract InheritanceDollarVaultUpgradeable is
 
     function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
 
+    function setMaxSupply(uint256 newMaxSupply) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newMaxSupply < _totalSupplyCustom) revert MaxSupplyExceeded();
+        maxSupply = newMaxSupply;
+    }
+
     function _revertOwnerDisabled() private pure {
         assembly {
             mstore(0x00, 0xf28dceb300000000000000000000000000000000000000000000000000000000)

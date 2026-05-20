@@ -22,3 +22,8 @@ gas_before.txt
 .env
 
 broadcast/
+
+# local env / mainnet artifacts
+.env*
+*.bak-before-*
+etherscan-standard-input.json
